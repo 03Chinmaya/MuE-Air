@@ -129,8 +129,6 @@ See [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for third-party ac
 
 - Built on **MuE** — the original project this app was derived from.
 - **Outfit** typeface, licensed under the SIL Open Font License.
-- Synced lyrics from **LRCLIB** and **lyrics.ovh**.
-- Music metadata and streams from unofficial **JioSaavn** and **YouTube Music** endpoints.
 - Built with **Kotlin**, **Jetpack Compose**, **Media3** and **AndroidX**.
 
 ---
