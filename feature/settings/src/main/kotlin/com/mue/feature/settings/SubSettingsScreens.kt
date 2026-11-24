@@ -122,6 +122,9 @@ fun PlaybackSettingsScreen(
     val skipSilence by viewModel.skipSilence.collectAsStateWithLifecycle()
     val loudnessNorm by viewModel.loudnessNorm.collectAsStateWithLifecycle()
     val bluetoothAvrcp by viewModel.bluetoothAvrcp.collectAsStateWithLifecycle()
+    val losslessAudio by viewModel.losslessAudio.collectAsStateWithLifecycle()
+    val automix by viewModel.automix.collectAsStateWithLifecycle()
+    val spatialAudio by viewModel.spatialAudio.collectAsStateWithLifecycle()
 
     var sliderSeconds by remember(crossfadeSeconds) { mutableFloatStateOf(crossfadeSeconds.toFloat()) }
 
@@ -243,24 +246,21 @@ fun PlaybackSettingsScreen(
             )
             GlassSwitchRow(
                 title = "Lossless Audio",
-                subtitle = "24-bit 96kHz FLAC studio quality (Coming Soon)",
-                checked = false,
-                onCheckedChange = {},
-                enabled = false
+                subtitle = "24-bit 96kHz FLAC studio quality",
+                checked = losslessAudio,
+                onCheckedChange = { viewModel.setLosslessAudio(it) }
             )
             GlassSwitchRow(
                 title = "Automix",
-                subtitle = "Seamless beat-matched AI track transitions (Coming Soon)",
-                checked = false,
-                onCheckedChange = {},
-                enabled = false
+                subtitle = "Seamless beat-matched AI track transitions",
+                checked = automix,
+                onCheckedChange = { viewModel.setAutomix(it) }
             )
             GlassSwitchRow(
                 title = "Spatial Audio",
-                subtitle = "Immersive multi-channel 3D soundstage (Coming Soon)",
-                checked = false,
-                onCheckedChange = {},
-                enabled = false
+                subtitle = "Immersive multi-channel 3D soundstage",
+                checked = spatialAudio,
+                onCheckedChange = { viewModel.setSpatialAudio(it) }
             )
         }
 
@@ -521,12 +521,6 @@ fun AppearanceSettingsScreen(
                 subtitle = "English (United States / International)",
                 selected = appLanguage == "English",
                 onClick = { viewModel.setAppLanguage("English") }
-            )
-            GlassOptionRow(
-                title = "Hindi (हिन्दी)",
-                subtitle = "हिन्दी भाषा",
-                selected = appLanguage == "Hindi",
-                onClick = { viewModel.setAppLanguage("Hindi") }
             )
         }
 

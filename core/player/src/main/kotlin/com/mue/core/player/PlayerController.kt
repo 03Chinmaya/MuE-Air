@@ -27,6 +27,7 @@ import com.mue.core.database.PlaybackHistoryEntity
 import com.mue.core.database.SongDao
 import com.mue.core.datastore.SettingsDataStore
 import com.mue.core.model.PlaybackState
+import com.mue.core.model.PlaybackRepeatMode
 import com.mue.core.model.ProviderId
 import com.mue.core.model.Track
 import com.mue.core.providers.JioSaavnProvider
@@ -159,8 +160,13 @@ class PlayerController @Inject constructor(
 
     fun setPreferredAudioDevice(device: AudioDeviceInfo?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            preferredAudioDevice = device
-            exoPlayer.setPreferredAudioDevice(device)
+            val am = audioManager
+            val speaker = am?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            }
+            val target = device ?: speaker
+            preferredAudioDevice = target
+            exoPlayer.setPreferredAudioDevice(target)
             _audioRoute.value = detectAudioRoute()
         }
     }
@@ -581,6 +587,12 @@ class PlayerController @Inject constructor(
                         _audioRoute.value = detectAudioRoute()
                     }
                     override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                        if (preferredAudioDevice != null && removedDevices != null) {
+                            if (removedDevices.any { it.id == preferredAudioDevice?.id }) {
+                                preferredAudioDevice = null
+                                exoPlayer.setPreferredAudioDevice(null)
+                            }
+                        }
                         _audioRoute.value = detectAudioRoute()
                     }
                 }, null)
@@ -714,11 +726,21 @@ class PlayerController @Inject constructor(
                         sleepWhenTrackEnds = false
                         _sleepTimerMinutes.value = null
                         exoPlayer.pause()
-                    } else if (_state.value.isRepeatEnabled) {
+                    } else if (_state.value.repeatMode == PlaybackRepeatMode.ONE) {
                         seekTo(0L)
                         exoPlayer.play()
-                    } else {
+                    } else if (_state.value.repeatMode == PlaybackRepeatMode.ALL) {
                         skipToNext()
+                    } else {
+                        val q = _queue.value
+                        val current = _state.value.currentTrack
+                        val currentIndex = if (current != null) q.indexOfFirst { it.id == current.id } else -1
+                        if (currentIndex in 0 until q.size - 1 || exoPlayer.hasNextMediaItem()) {
+                            skipToNext()
+                        } else {
+                            exoPlayer.pause()
+                            seekTo(0L)
+                        }
                     }
                 }
             }
@@ -963,9 +985,20 @@ class PlayerController @Inject constructor(
     }
 
     fun toggleRepeat() {
-        val newRepeat = !_state.value.isRepeatEnabled
-        exoPlayer.repeatMode = if (newRepeat) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
-        _state.value = _state.value.copy(isRepeatEnabled = newRepeat)
+        val nextMode = when (_state.value.repeatMode) {
+            PlaybackRepeatMode.OFF -> PlaybackRepeatMode.ALL
+            PlaybackRepeatMode.ALL -> PlaybackRepeatMode.ONE
+            PlaybackRepeatMode.ONE -> PlaybackRepeatMode.OFF
+        }
+        exoPlayer.repeatMode = when (nextMode) {
+            PlaybackRepeatMode.OFF -> Player.REPEAT_MODE_OFF
+            PlaybackRepeatMode.ALL -> Player.REPEAT_MODE_ALL
+            PlaybackRepeatMode.ONE -> Player.REPEAT_MODE_ONE
+        }
+        _state.value = _state.value.copy(
+            repeatMode = nextMode,
+            isRepeatEnabled = nextMode != PlaybackRepeatMode.OFF
+        )
     }
 
     fun skipToNext() {

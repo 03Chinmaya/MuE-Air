@@ -677,12 +677,34 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         return fp
     }
 
+    val displayNameFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[USER_DISPLAY_NAME] ?: "MuE Listener"
+    }
+
+    suspend fun setDisplayName(name: String) {
+        context.dataStore.edit { prefs ->
+            prefs[USER_DISPLAY_NAME] = name
+        }
+    }
+
+    val userBioFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[USER_BIO] ?: "Music enthusiast & MuE listener"
+    }
+
+    suspend fun setUserBio(bio: String) {
+        context.dataStore.edit { prefs ->
+            prefs[USER_BIO] = bio
+        }
+    }
+
     companion object {
         val KEY_GUEST_ID = stringPreferencesKey("guest_id")
         val KEY_DEVICE_ID = stringPreferencesKey("device_id")
         val KEY_DEVICE_FINGERPRINT = stringPreferencesKey("device_fingerprint")
         val KEY_USER_ID = stringPreferencesKey("user_id")
         val KEY_IS_GUEST = booleanPreferencesKey("is_guest")
+        val USER_DISPLAY_NAME = stringPreferencesKey("user_display_name")
+        val USER_BIO = stringPreferencesKey("user_bio")
         val KEY_SYNC_CURSOR = stringPreferencesKey("sync_cursor")
 
         val THEME = stringPreferencesKey("theme")

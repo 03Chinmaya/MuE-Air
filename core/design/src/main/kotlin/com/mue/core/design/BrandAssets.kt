@@ -27,16 +27,17 @@ object BrandDrawables {
     val logoWhite: Int = R.drawable.logo_mue_air_white
     val watermark: Int = R.drawable.logo_mue_air_watermark
     val lt: Int = R.drawable.l_t
-    val logoHeader: Int = R.drawable.ic_mue_logo
+    val logoHeader: Int = R.drawable.ic_mue_1
+    val logo1: Int = R.drawable.ic_mue_1
 }
 
 /**
- * Official MuE-Air Header Logo (from assets/branding/MuE-Logo.png).
+ * Official MuE-Air Header Logo (from assets/branding/MuE-1.png).
  */
 @Composable
 fun MuEHeaderLogo(
     modifier: Modifier = Modifier,
-    height: Dp = 28.dp,
+    height: Dp = 34.dp,
     contentDescription: String? = "MuE-Air"
 ) {
     Image(

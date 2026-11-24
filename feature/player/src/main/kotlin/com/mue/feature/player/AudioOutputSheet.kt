@@ -4,6 +4,7 @@ package com.mue.feature.player
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -37,7 +38,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,7 +74,35 @@ fun AudioOutputSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val audioOutputs = remember(currentRoute) {
+    var refreshCount by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        val callback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            object : AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                    refreshCount++
+                }
+                override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                    refreshCount++
+                }
+            }.also {
+                try {
+                    audioManager?.registerAudioDeviceCallback(it, null)
+                } catch (_: Exception) {}
+            }
+        } else null
+
+        onDispose {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && callback != null) {
+                try {
+                    audioManager?.unregisterAudioDeviceCallback(callback)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    val audioOutputs = remember(currentRoute, refreshCount) {
         val items = mutableListOf<AudioOutputItem>()
         val isPhoneActive = currentRoute.equals("This phone", ignoreCase = true)
         
@@ -87,6 +120,7 @@ fun AudioOutputSheet(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
             val devices = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS).orEmpty()
+            val seenDeviceNames = mutableSetOf<String>()
 
             for (device in devices) {
                 if (!device.isSink) continue
@@ -104,63 +138,71 @@ fun AudioOutputSheet(
                         val name = device.productName?.toString()?.trim().let {
                             if (!it.isNullOrBlank()) it else "Bluetooth"
                         }
-                        val isActive = currentRoute.equals(name, ignoreCase = true) || 
-                            (!isPhoneActive && currentRoute.contains("Bluetooth", ignoreCase = true))
-                        items.add(
-                            AudioOutputItem(
-                                id = "bt_${device.id}",
-                                name = name,
-                                description = "Bluetooth Audio",
-                                icon = Icons.Default.Bluetooth,
-                                device = device,
-                                isActive = isActive
+                        if (seenDeviceNames.add(name)) {
+                            val isActive = currentRoute.equals(name, ignoreCase = true) || 
+                                (!isPhoneActive && currentRoute.contains("Bluetooth", ignoreCase = true))
+                            items.add(
+                                AudioOutputItem(
+                                    id = "bt_${device.id}",
+                                    name = name,
+                                    description = "Bluetooth Audio",
+                                    icon = Icons.Default.Bluetooth,
+                                    device = device,
+                                    isActive = isActive
+                                )
                             )
-                        )
+                        }
                     }
                     AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
                     AudioDeviceInfo.TYPE_WIRED_HEADSET -> {
                         val name = "Wired Headphones"
-                        items.add(
-                            AudioOutputItem(
-                                id = "wired_${device.id}",
-                                name = name,
-                                description = "3.5mm Headphone Jack",
-                                icon = Icons.Default.Headphones,
-                                device = device,
-                                isActive = currentRoute.equals(name, ignoreCase = true)
+                        if (seenDeviceNames.add(name)) {
+                            items.add(
+                                AudioOutputItem(
+                                    id = "wired_${device.id}",
+                                    name = name,
+                                    description = "3.5mm Headphone Jack",
+                                    icon = Icons.Default.Headphones,
+                                    device = device,
+                                    isActive = currentRoute.equals(name, ignoreCase = true)
+                                )
                             )
-                        )
+                        }
                     }
                     AudioDeviceInfo.TYPE_USB_HEADSET,
                     AudioDeviceInfo.TYPE_USB_DEVICE -> {
                         val name = device.productName?.toString()?.trim().let {
                             if (!it.isNullOrBlank()) it else "USB Audio"
                         }
-                        items.add(
-                            AudioOutputItem(
-                                id = "usb_${device.id}",
-                                name = name,
-                                description = "USB Audio Device",
-                                icon = Icons.Default.Headphones,
-                                device = device,
-                                isActive = currentRoute.equals("USB Audio", ignoreCase = true) || currentRoute.equals(name, ignoreCase = true)
+                        if (seenDeviceNames.add(name)) {
+                            items.add(
+                                AudioOutputItem(
+                                    id = "usb_${device.id}",
+                                    name = name,
+                                    description = "USB Audio Device",
+                                    icon = Icons.Default.Headphones,
+                                    device = device,
+                                    isActive = currentRoute.equals("USB Audio", ignoreCase = true) || currentRoute.equals(name, ignoreCase = true)
+                                )
                             )
-                        )
+                        }
                     }
                     AudioDeviceInfo.TYPE_HDMI,
                     AudioDeviceInfo.TYPE_LINE_ANALOG,
                     AudioDeviceInfo.TYPE_LINE_DIGITAL -> {
                         val name = "External Audio"
-                        items.add(
-                            AudioOutputItem(
-                                id = "ext_${device.id}",
-                                name = name,
-                                description = "Line out / HDMI",
-                                icon = Icons.Default.Speaker,
-                                device = device,
-                                isActive = currentRoute.equals(name, ignoreCase = true)
+                        if (seenDeviceNames.add(name)) {
+                            items.add(
+                                AudioOutputItem(
+                                    id = "ext_${device.id}",
+                                    name = name,
+                                    description = "Line out / HDMI",
+                                    icon = Icons.Default.Speaker,
+                                    device = device,
+                                    isActive = currentRoute.equals(name, ignoreCase = true)
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }

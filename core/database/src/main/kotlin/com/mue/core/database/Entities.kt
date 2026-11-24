@@ -131,6 +131,16 @@ data class PlaylistTrackEntity(
     val serverId: String? = null
 )
 
+fun PlaylistTrackEntity.toTrack(): Track = Track(
+    id = providerTrackId.ifBlank { id },
+    title = title,
+    artist = artist,
+    album = album ?: "",
+    artworkUrl = artworkUrl,
+    durationMs = durationMs,
+    provider = try { ProviderId.valueOf(provider) } catch (_: Exception) { ProviderId.YOUTUBE_MUSIC }
+)
+
 @Entity(
     tableName = "playback_history",
     indices = [androidx.room.Index(value = ["playedAt"])]

@@ -558,7 +558,7 @@ fun HomeTitle(
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MuEHeaderLogo(height = 32.dp)
+        MuEHeaderLogo(height = 24.dp)
     }
 }
 

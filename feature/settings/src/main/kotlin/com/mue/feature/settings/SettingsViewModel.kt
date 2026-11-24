@@ -19,6 +19,8 @@ import com.mue.core.datastore.SettingsDataStore
 
 import com.mue.core.player.DownloadManager
 import com.mue.core.player.MediaCacheManager
+import com.mue.core.network.UpdateChecker
+import com.mue.core.network.UpdateInfo
 import com.mue.feature.settings.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -59,12 +61,14 @@ class SettingsViewModel @Inject constructor(
     private val downloadManager: DownloadManager,
     private val authRepository: AuthRepository,
     private val databaseWiper: DatabaseWiper,
-    private val mediaCacheManager: MediaCacheManager
+    private val mediaCacheManager: MediaCacheManager,
+    private val updateChecker: UpdateChecker
 ) : ViewModel() {
 
     sealed interface UpdateCheckState {
         object Idle : UpdateCheckState
         object Checking : UpdateCheckState
+        data class UpdateAvailable(val info: UpdateInfo) : UpdateCheckState
         object UpToDate : UpdateCheckState
         data class Error(val message: String) : UpdateCheckState
     }
@@ -91,11 +95,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun fetchServerVersion() {
-        _serverVersion.value = "1.0.0"
+        viewModelScope.launch {
+            _serverVersion.value = updateChecker.fetchServerVersion()
+        }
     }
 
-    fun checkForUpdates() {
-        _updateCheckState.value = UpdateCheckState.UpToDate
+    fun checkForUpdates(currentVersion: String = BuildConfig.VERSION_NAME) {
+        viewModelScope.launch {
+            _updateCheckState.value = UpdateCheckState.Checking
+            try {
+                val info = updateChecker.checkForUpdates(currentVersion = currentVersion, force = true)
+                if (info != null && info.downloadUrl.isNotBlank()) {
+                    _updateCheckState.value = UpdateCheckState.UpdateAvailable(info)
+                } else {
+                    _updateCheckState.value = UpdateCheckState.UpToDate
+                }
+            } catch (e: Exception) {
+                _updateCheckState.value = UpdateCheckState.Error(e.message ?: "Failed to check for updates")
+            }
+        }
     }
 
     fun dismissUpdateDialog() {
@@ -128,18 +146,22 @@ class SettingsViewModel @Inject constructor(
     }
 
 
-    private val _displayName = MutableStateFlow("MuE Listener")
-    val displayName: StateFlow<String> = _displayName.asStateFlow()
+    val displayName: StateFlow<String> = settingsDataStore.displayNameFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "MuE Listener")
 
-    private val _userBio = MutableStateFlow("Music enthusiast & MuE listener")
-    val userBio: StateFlow<String> = _userBio.asStateFlow()
+    val userBio: StateFlow<String> = settingsDataStore.userBioFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Music enthusiast & MuE listener")
 
     fun updateDisplayName(name: String) {
-        _displayName.value = name
+        viewModelScope.launch {
+            settingsDataStore.setDisplayName(name)
+        }
     }
 
     fun updateUserBio(bio: String) {
-        _userBio.value = bio
+        viewModelScope.launch {
+            settingsDataStore.setUserBio(bio)
+        }
     }
 
     fun logout(onComplete: () -> Unit = {}) {
@@ -297,6 +319,9 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val spatialAudio: StateFlow<Boolean> = settingsDataStore.spatialAudioFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val losslessAudio: StateFlow<Boolean> = settingsDataStore.losslessAudioFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val reduceAnimation: StateFlow<Boolean> = settingsDataStore.reduceAnimationFlow
@@ -645,6 +670,12 @@ class SettingsViewModel @Inject constructor(
     fun setSpatialAudio(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setSpatialAudio(enabled)
+        }
+    }
+
+    fun setLosslessAudio(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setLosslessAudio(enabled)
         }
     }
 

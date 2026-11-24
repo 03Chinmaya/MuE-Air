@@ -42,12 +42,10 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Documentation (Tracked)
-!docs/
-!docs/**
+# Documentation (Isolated from git)
+docs/
 *.md
 !README.md
-!docs/**/*.md
 .agents/
 android_assets/
 assets/*.bundle

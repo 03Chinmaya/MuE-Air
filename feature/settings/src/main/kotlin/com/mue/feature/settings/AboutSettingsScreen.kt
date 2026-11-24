@@ -1,5 +1,6 @@
 package com.mue.feature.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,11 +24,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -40,12 +45,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mue.core.design.MuELogo
+import com.mue.core.common.ApkDownloader
+import com.mue.core.design.AccentRed
 import com.mue.core.design.DarkGrey
+import com.mue.core.design.MuELogo
 import com.mue.core.design.MutedGrey
 import com.mue.core.design.PureBlack
 import com.mue.core.design.PureWhite
 import com.mue.core.design.SettingsSection
+import com.mue.core.design.UpdateDialog
 import com.mue.core.design.applePressEffect
 
 @Composable
@@ -56,6 +64,7 @@ fun AboutSettingsScreen(
     val context = LocalContext.current
     val serverVersion by viewModel.serverVersion.collectAsStateWithLifecycle()
     val releaseChannel by viewModel.releaseChannel.collectAsStateWithLifecycle()
+    val updateCheckState by viewModel.updateCheckState.collectAsStateWithLifecycle()
 
     val clientVersion = remember(context) {
         try {
@@ -63,6 +72,34 @@ fun AboutSettingsScreen(
         } catch (_: Exception) {
             "1.0"
         }
+    }
+
+    LaunchedEffect(updateCheckState) {
+        when (val state = updateCheckState) {
+            is SettingsViewModel.UpdateCheckState.UpToDate -> {
+                Toast.makeText(context, "You are using the latest version of MuE-Air", Toast.LENGTH_SHORT).show()
+            }
+            is SettingsViewModel.UpdateCheckState.Error -> {
+                Toast.makeText(context, "Update check: ${state.message}", Toast.LENGTH_SHORT).show()
+            }
+            else -> {}
+        }
+    }
+
+    // Update Pop-up Dialog
+    if (updateCheckState is SettingsViewModel.UpdateCheckState.UpdateAvailable) {
+        val info = (updateCheckState as SettingsViewModel.UpdateCheckState.UpdateAvailable).info
+        UpdateDialog(
+            version = info.version,
+            changelog = info.changelog,
+            onUpdate = {
+                viewModel.dismissUpdateDialog()
+                Toast.makeText(context, "Downloading update in background...", Toast.LENGTH_SHORT).show()
+                ApkDownloader.downloadAndInstall(context, info.downloadUrl)
+            },
+            onDoItLater = { viewModel.dismissUpdateDialog() },
+            onDismissRequest = { viewModel.dismissUpdateDialog() }
+        )
     }
 
     Column(
@@ -151,6 +188,39 @@ fun AboutSettingsScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .applePressEffect()
+                        .clickable {
+                            if (updateCheckState !is SettingsViewModel.UpdateCheckState.Checking) {
+                                viewModel.checkForUpdates(clientVersion)
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Check for Updates", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
+                        Text("Query latest releases & OTA APK", color = MutedGrey, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (updateCheckState is SettingsViewModel.UpdateCheckState.Checking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "Check Now",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -180,3 +250,4 @@ fun AboutSettingsScreen(
         }
     }
 }
+

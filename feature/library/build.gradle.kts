@@ -29,6 +29,7 @@ dependencies {
     implementation(project(":core:datastore"))
     implementation(project(":core:player"))
     implementation(project(":core:network"))
+    implementation(project(":core:providers"))
     implementation(libs.coil.compose)
 
     implementation(platform(libs.androidx.compose.bom))

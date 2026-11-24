@@ -64,6 +64,7 @@ fun PlaylistListScreen(
     playlists: List<UnifiedPlaylist>,
     onBack: () -> Unit,
     onPlay: (id: String, isImported: Boolean) -> Unit,
+    onOpenPlaylist: (UnifiedPlaylist) -> Unit = { p -> onPlay(p.id, p.isImported) },
     onCreatePlaylist: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -173,7 +174,7 @@ fun PlaylistListScreen(
                     items(playlists, key = { "${if (it.isImported) "imp_" else "loc_"}${it.id}" }) { playlist ->
                         UnifiedPlaylistRow(
                             playlist = playlist,
-                            onClick = { onPlay(playlist.id, playlist.isImported) }
+                            onClick = { onOpenPlaylist(playlist) }
                         )
                     }
                 }

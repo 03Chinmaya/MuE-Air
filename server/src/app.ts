@@ -23,6 +23,7 @@ import { artistRoutes } from './routes/artistRoutes.js';
 import { playlistRoutes } from './routes/playlistRoutes.js';
 import { settingsRoutes } from './routes/settingsRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
+import { updatesRoutes } from './routes/updatesRoutes.js';
 import { logger } from './lib/logger.js';
 import { AppEnv } from './types.js';
 
@@ -194,6 +195,7 @@ app.route('/api/artists', artistRoutes);
 app.route('/api/playlists', playlistRoutes);
 app.route('/api/settings', settingsRoutes);
 app.route('/api/import', importRoutes);
+app.route('/api/updates', updatesRoutes);
 
 // Image proxy for mobile environments with DNS restrictions
 app.get('/api/proxy/image', async (c) => {

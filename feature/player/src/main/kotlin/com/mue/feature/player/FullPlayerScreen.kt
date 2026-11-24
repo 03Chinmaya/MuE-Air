@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
@@ -127,6 +128,7 @@ import com.mue.core.design.sharedArtworkElement
 import com.mue.core.lyrics.LyricsRepository
 import com.mue.core.lyrics.model.TrackLyrics
 import com.mue.core.model.ProviderId
+import com.mue.core.model.PlaybackRepeatMode
 import com.mue.core.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -162,6 +164,7 @@ fun FullPlayerScreen(
     onRepeat: () -> Unit = {},
     isShuffleEnabled: Boolean = false,
     isRepeatEnabled: Boolean = false,
+    repeatMode: PlaybackRepeatMode = if (isRepeatEnabled) PlaybackRepeatMode.ALL else PlaybackRepeatMode.OFF,
     onTrackSelect: (Track) -> Unit = {},
     onRemoveFromQueue: ((Track) -> Unit)? = null,
     onListenTogether: (() -> Unit)? = null,
@@ -660,9 +663,13 @@ fun FullPlayerScreen(
                 }
                 IconButton(onClick = onRepeat) {
                     Icon(
-                        imageVector = Icons.Default.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (isRepeatEnabled) AccentBlue else PureWhite.copy(alpha = 0.85f),
+                        imageVector = if (repeatMode == PlaybackRepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Default.Repeat,
+                        contentDescription = when (repeatMode) {
+                            PlaybackRepeatMode.OFF -> "Repeat Off"
+                            PlaybackRepeatMode.ALL -> "Repeat All"
+                            PlaybackRepeatMode.ONE -> "Repeat One"
+                        },
+                        tint = if (repeatMode != PlaybackRepeatMode.OFF) AccentBlue else PureWhite.copy(alpha = 0.4f),
                         modifier = Modifier.size(24.dp)
                     )
                 }

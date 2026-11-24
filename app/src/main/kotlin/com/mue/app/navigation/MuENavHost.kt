@@ -41,6 +41,7 @@ import com.mue.feature.artist.ArtistSongsScreen
 import com.mue.feature.artist.ArtistVideosScreen
 import com.mue.feature.auth.AuthChoiceScreen
 import com.mue.feature.home.HomeScreen
+import com.mue.feature.library.CollectionDetailScreen
 import com.mue.feature.library.DownloadsScreen
 import com.mue.feature.library.HistoryScreen
 import com.mue.feature.library.LibraryScreen
@@ -158,8 +159,11 @@ fun MuENavHost(
                                             viewModel.playQueue(queue.ifEmpty { listOf(track) }, queue.indexOf(track).coerceAtLeast(0), source)
                                             showFullPlayer = true
                                         },
-                                        onPlaylistClick = {
-                                            navController.navigate("library")
+                                        onPlaylistClick = { playlistTrack ->
+                                            val title = android.net.Uri.encode(playlistTrack.title)
+                                            val art = android.net.Uri.encode(playlistTrack.artworkUrl ?: "")
+                                            val author = android.net.Uri.encode(playlistTrack.artist)
+                                            navController.navigate("playlist/${playlistTrack.id}?title=$title&art=$art&author=$author&isImported=true")
                                         },
                                         onNavigateToArtist = { routeOrId ->
                                             if (routeOrId.startsWith("artist/")) {
@@ -188,6 +192,12 @@ fun MuENavHost(
                                             } else {
                                                 navController.navigate("artist/$routeOrId")
                                             }
+                                        },
+                                        onNavigateToAlbum = { albumRoute ->
+                                            navController.navigate(albumRoute)
+                                        },
+                                        onNavigateToPlaylist = { playlistRoute ->
+                                            navController.navigate(playlistRoute)
                                         }
                                     )
                                 }
@@ -247,6 +257,12 @@ fun MuENavHost(
                                         playlists = playlists,
                                         onBack = { navController.popBackStack() },
                                         onPlay = { id, isImported -> libVm.playPlaylist(id, isImported) },
+                                        onOpenPlaylist = { playlist ->
+                                            val title = android.net.Uri.encode(playlist.name)
+                                            val art = android.net.Uri.encode(playlist.artworkUrl ?: "")
+                                            val isImp = playlist.isImported
+                                            navController.navigate("playlist/${playlist.id}?title=$title&art=$art&isImported=$isImp")
+                                        },
                                         onCreatePlaylist = { name -> libVm.createPlaylist(name) }
                                     )
                                 }
@@ -276,7 +292,7 @@ fun MuENavHost(
                                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
                                     ArtistProfileScreen(
                                         onBack = { navController.popBackStack() },
-                                        onNavigateToAlbum = { /* future album view */ },
+                                        onNavigateToAlbum = { albumId -> navController.navigate("album/$albumId") },
                                         onNavigateToAllSongs = { navController.navigate("artist/$artistId/songs") },
                                         onNavigateToAllVideos = { navController.navigate("artist/$artistId/videos") }
                                     )
@@ -303,6 +319,133 @@ fun MuENavHost(
                                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
                                     ArtistVideosScreen(
                                         onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+                            composable(
+                                route = "collection/{type}/{id}?title={title}&art={art}&sub={sub}&isImported={isImported}",
+                                arguments = listOf(
+                                    navArgument("type") { type = NavType.StringType },
+                                    navArgument("id") { type = NavType.StringType },
+                                    navArgument("title") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("art") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("sub") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("isImported") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
+                                    }
+                                )
+                            ) {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    CollectionDetailScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onNavigateToArtist = { artistRouteOrId ->
+                                            if (artistRouteOrId.startsWith("artist/")) {
+                                                navController.navigate(artistRouteOrId)
+                                            } else {
+                                                navController.navigate("artist/$artistRouteOrId")
+                                            }
+                                        },
+                                        onTrackClick = { track, queue, source ->
+                                            viewModel.playQueue(queue, queue.indexOf(track).coerceAtLeast(0), source)
+                                            showFullPlayer = true
+                                        }
+                                    )
+                                }
+                            }
+                            composable(
+                                route = "album/{albumId}?title={title}&art={art}&artist={artist}&type={type}",
+                                arguments = listOf(
+                                    navArgument("albumId") { type = NavType.StringType },
+                                    navArgument("title") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("art") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("artist") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("type") {
+                                        type = NavType.StringType
+                                        defaultValue = "album"
+                                    }
+                                )
+                            ) {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    CollectionDetailScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onNavigateToArtist = { artistRouteOrId ->
+                                            if (artistRouteOrId.startsWith("artist/")) {
+                                                navController.navigate(artistRouteOrId)
+                                            } else {
+                                                navController.navigate("artist/$artistRouteOrId")
+                                            }
+                                        },
+                                        onTrackClick = { track, queue, source ->
+                                            viewModel.playQueue(queue, queue.indexOf(track).coerceAtLeast(0), source)
+                                            showFullPlayer = true
+                                        }
+                                    )
+                                }
+                            }
+                            composable(
+                                route = "playlist/{playlistId}?title={title}&art={art}&author={author}&isImported={isImported}",
+                                arguments = listOf(
+                                    navArgument("playlistId") { type = NavType.StringType },
+                                    navArgument("title") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("art") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("author") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("isImported") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
+                                    }
+                                )
+                            ) {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    CollectionDetailScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onNavigateToArtist = { artistRouteOrId ->
+                                            if (artistRouteOrId.startsWith("artist/")) {
+                                                navController.navigate(artistRouteOrId)
+                                            } else {
+                                                navController.navigate("artist/$artistRouteOrId")
+                                            }
+                                        },
+                                        onTrackClick = { track, queue, source ->
+                                            viewModel.playQueue(queue, queue.indexOf(track).coerceAtLeast(0), source)
+                                            showFullPlayer = true
+                                        }
                                     )
                                 }
                             }
@@ -419,6 +562,7 @@ fun MuENavHost(
                                 onRepeat = { viewModel.toggleRepeat() },
                                 isShuffleEnabled = playbackState.isShuffleEnabled,
                                 isRepeatEnabled = playbackState.isRepeatEnabled,
+                                repeatMode = playbackState.repeatMode,
                                 onTrackSelect = { viewModel.playTrack(it) },
                                 onRemoveFromQueue = { viewModel.removeFromQueue(it.id) },
                                 onListenTogether = {

@@ -94,7 +94,7 @@ fun MuELayout(
                             }
                             if (titleText.isEmpty()) {
                                 MuEHeaderLogo(
-                                    height = 28.dp
+                                    height = 34.dp
                                 )
                             } else {
                                 Text(

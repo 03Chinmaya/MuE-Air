@@ -219,7 +219,14 @@ class HomeViewModel @Inject constructor(
                     val start = System.currentTimeMillis()
                     try {
                         val itxHome = innerTubeXProvider.getHomeSections()
-                        val newRel = if (itxHome.isNotEmpty()) itxHome else serverYouTubeProvider.getNewReleases("IN")
+                        val rawNewRel = if (itxHome.isNotEmpty()) itxHome else serverYouTubeProvider.getNewReleases("IN")
+                        var newRel = rawNewRel.filter { ContentQualityFilter.isIndianOrRegional(it) }
+                        if (newRel.size < 5) {
+                            val jioFall = jioSaavnProvider.search("latest hindi punjabi trending").filter { !ContentQualityFilter.shouldReject(it) }
+                            if (jioFall.isNotEmpty()) {
+                                newRel = (newRel + jioFall).distinctBy { it.id }.take(20)
+                            }
+                        }
                         val elapsed = System.currentTimeMillis() - start
                         if (elapsed < 25L) delay(25L - elapsed)
                         if (newRel.isEmpty()) throw IOException("Empty New Releases")
@@ -241,7 +248,11 @@ class HomeViewModel @Inject constructor(
                 val j3 = launch {
                     val start = System.currentTimeMillis()
                     try {
-                        val playlists = serverYouTubeProvider.getCommunityPlaylists("IN")
+                        val rawPlaylists = serverYouTubeProvider.getCommunityPlaylists("IN")
+                        var playlists = rawPlaylists.filter { ContentQualityFilter.isIndianOrRegional(it) }
+                        if (playlists.isEmpty()) {
+                            playlists = rawPlaylists
+                        }
                         val elapsed = System.currentTimeMillis() - start
                         if (elapsed < 25L) delay(25L - elapsed)
                         if (playlists.isEmpty()) throw IOException("Empty Community Playlists")
@@ -263,7 +274,11 @@ class HomeViewModel @Inject constructor(
                 val j4 = launch {
                     val start = System.currentTimeMillis()
                     try {
-                        val albums = serverYouTubeProvider.getAlbumsAndSingles("IN")
+                        val rawAlbums = serverYouTubeProvider.getAlbumsAndSingles("IN")
+                        var albums = rawAlbums.filter { ContentQualityFilter.isIndianOrRegional(it) }
+                        if (albums.isEmpty()) {
+                            albums = rawAlbums
+                        }
                         val elapsed = System.currentTimeMillis() - start
                         if (elapsed < 25L) delay(25L - elapsed)
                         if (albums.isEmpty()) throw IOException("Empty Albums")
@@ -286,11 +301,18 @@ class HomeViewModel @Inject constructor(
                     val start = System.currentTimeMillis()
                     try {
                         val itxTrending = innerTubeXProvider.getHomeSections()
-                        val trending = if (itxTrending.isNotEmpty()) itxTrending else serverYouTubeProvider.getTrending("IN")
+                        val rawTrending = if (itxTrending.isNotEmpty()) itxTrending else serverYouTubeProvider.getTrending("IN")
+                        var filteredTrending = rawTrending.filter { ContentQualityFilter.isIndianOrRegional(it) }
+                        if (filteredTrending.size < 5) {
+                            val jioTrending = jioSaavnProvider.search("top songs hindi bollywood").filter { !ContentQualityFilter.shouldReject(it) }
+                            if (jioTrending.isNotEmpty()) {
+                                filteredTrending = (filteredTrending + jioTrending).distinctBy { it.id }.take(25)
+                            }
+                        }
                         val elapsed = System.currentTimeMillis() - start
                         if (elapsed < 25L) delay(25L - elapsed)
-                        if (trending.isEmpty()) throw IOException("Empty Trending")
-                        val ranked = homeRecommendationEngine.rankCandidates(trending)
+                        if (filteredTrending.isEmpty()) throw IOException("Empty Trending")
+                        val ranked = homeRecommendationEngine.rankCandidates(filteredTrending)
                         _trendingIndia.value = ranked
                         _sectionStates.update { it + ("trending_feed" to SkeletonState.Content(ranked)) }
                         _error.value = null
@@ -326,7 +348,8 @@ class HomeViewModel @Inject constructor(
 
     private fun backfillQuickPicks() {
         if (_quickPicks.value.size < 21) {
-            val backfillPool = _trendingIndia.value.ifEmpty { _newReleases.value }
+            val backfillPool = (_trendingIndia.value.ifEmpty { _newReleases.value })
+                .filter { ContentQualityFilter.isIndianOrRegional(it) }
             val backfilled = QuickPicksBackfiller.backfill(_quickPicks.value, backfillPool, 21)
             if (backfilled.size != _quickPicks.value.size) {
                 _quickPicks.value = backfilled

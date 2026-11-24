@@ -86,7 +86,8 @@ class HomeRecommendationEngine @Inject constructor(
 
                     if (ContentQualityFilter.isAI(track) ||
                         ContentQualityFilter.isCounterfeit(track) ||
-                        track.videoType == "UGC"
+                        track.videoType == "UGC" ||
+                        !ContentQualityFilter.isIndianOrRegional(track)
                     ) {
                         null
                     } else {
@@ -103,7 +104,7 @@ class HomeRecommendationEngine @Inject constructor(
             if (scored.size < 21 && fallbackTracks.isNotEmpty()) {
                 val scoredIds = scored.map { it.id }.toSet()
                 val backfill = fallbackTracks
-                    .filter { it.id !in scoredIds && !ContentQualityFilter.shouldReject(it) }
+                    .filter { it.id !in scoredIds && !ContentQualityFilter.shouldReject(it) && ContentQualityFilter.isIndianOrRegional(it) }
                     .take(21 - scored.size)
                 scored + backfill
             } else {
@@ -124,7 +125,8 @@ class HomeRecommendationEngine @Inject constructor(
                 val isAiOrCounterfeit = ContentQualityFilter.isAI(track) || ContentQualityFilter.isCounterfeit(track)
                 val isUgc = track.videoType == "UGC"
                 val isUnverified = track.videoType == null && track.albumId == null && track.album.isNullOrBlank()
-                !isAiOrCounterfeit && !isUgc && !isUnverified
+                val isIndian = ContentQualityFilter.isIndianOrRegional(track)
+                !isAiOrCounterfeit && !isUgc && !isUnverified && isIndian
             }
 
             val history = libraryDao.getRecentHistory().firstOrNull() ?: emptyList()

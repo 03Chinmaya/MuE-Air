@@ -87,7 +87,9 @@ fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
     onTrackClick: (Track) -> Unit = { viewModel.playTrack(it) },
     onNavigateToLibrary: () -> Unit = {},
-    onNavigateToArtist: (String) -> Unit = {}
+    onNavigateToArtist: (String) -> Unit = {},
+    onNavigateToAlbum: (String) -> Unit = {},
+    onNavigateToPlaylist: (String) -> Unit = {}
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
@@ -423,7 +425,7 @@ fun SearchScreen(
                                 onPlayTrack = { track -> onTrackClick(track) },
                                 onAddTrack = { track -> viewModel.addToQueue(track) },
                                 onArtistClick = onNavigateToArtist,
-                                onAlbumClick = { /* album click */ }
+                                onAlbumClick = { albumId -> onNavigateToAlbum("album/$albumId") }
                             )
                             Spacer(modifier = Modifier.height(14.dp))
                         }
@@ -500,7 +502,14 @@ fun SearchScreen(
                                         title = album.title ?: album.name ?: "Album",
                                         subtitle = album.subtitle ?: (album.year?.let { "$it" } ?: "Album"),
                                         artworkUrl = album.artworkUrl,
-                                        onClick = { onTrackClick(album.toTrack()) },
+                                        onClick = {
+                                            val albumId = album.id ?: ""
+                                            val title = android.net.Uri.encode(album.title ?: album.name ?: "")
+                                            val art = android.net.Uri.encode(album.artworkUrl ?: "")
+                                            val artist = android.net.Uri.encode(album.subtitle ?: "")
+                                            val type = if (album.title?.contains("EP", ignoreCase = true) == true) "ep" else "album"
+                                            onNavigateToAlbum("album/$albumId?title=$title&art=$art&artist=$artist&type=$type")
+                                        },
                                         modifier = Modifier.size(150.dp)
                                     )
                                 }
@@ -560,7 +569,13 @@ fun SearchScreen(
                                         title = playlist.title ?: playlist.name ?: "Playlist",
                                         subtitle = playlist.subtitle ?: playlist.author ?: "Community Playlist",
                                         artworkUrl = playlist.artworkUrl ?: playlist.thumbnail,
-                                        onClick = { onTrackClick(playlist.toTrack()) },
+                                        onClick = {
+                                            val playlistId = playlist.id ?: ""
+                                            val title = android.net.Uri.encode(playlist.title ?: playlist.name ?: "")
+                                            val art = android.net.Uri.encode(playlist.artworkUrl ?: playlist.thumbnail ?: "")
+                                            val author = android.net.Uri.encode(playlist.subtitle ?: playlist.author ?: "")
+                                            onNavigateToPlaylist("playlist/$playlistId?title=$title&art=$art&author=$author")
+                                        },
                                         modifier = Modifier.size(150.dp)
                                     )
                                 }
@@ -621,7 +636,14 @@ fun SearchScreen(
                                     title = albumTrack.title,
                                     subtitle = albumTrack.artist,
                                     artworkUrl = albumTrack.artworkUrl,
-                                    onClick = { onTrackClick(albumTrack) },
+                                    onClick = {
+                                        val albumId = albumTrack.id
+                                        val title = android.net.Uri.encode(albumTrack.title)
+                                        val art = android.net.Uri.encode(albumTrack.artworkUrl ?: "")
+                                        val artist = android.net.Uri.encode(albumTrack.artist)
+                                        val type = if (albumTrack.title.contains("EP", ignoreCase = true)) "ep" else "album"
+                                        onNavigateToAlbum("album/$albumId?title=$title&art=$art&artist=$artist&type=$type")
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -646,7 +668,13 @@ fun SearchScreen(
                                     title = playlistTrack.title,
                                     subtitle = playlistTrack.artist,
                                     artworkUrl = playlistTrack.artworkUrl,
-                                    onClick = { onTrackClick(playlistTrack) },
+                                    onClick = {
+                                        val playlistId = playlistTrack.id
+                                        val title = android.net.Uri.encode(playlistTrack.title)
+                                        val art = android.net.Uri.encode(playlistTrack.artworkUrl ?: "")
+                                        val author = android.net.Uri.encode(playlistTrack.artist)
+                                        onNavigateToPlaylist("playlist/$playlistId?title=$title&art=$art&author=$author")
+                                    },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
