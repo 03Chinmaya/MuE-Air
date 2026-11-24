@@ -40,8 +40,8 @@ describe('Updates Routes Tests', () => {
       published_at: '2026-11-01T00:00:00Z',
       assets: [
         {
-          name: 'mue-v2.1.0.apk',
-          browser_download_url: 'https://github.com/03Chinmaya/MuE/releases/download/v2.1.0/app.apk',
+          name: 'mue-air-v2.1.0.apk',
+          browser_download_url: 'https://github.com/03Chinmaya/MuE-Air/releases/download/v2.1.0/app.apk',
           size: 15728640,
         },
       ],
@@ -62,7 +62,7 @@ describe('Updates Routes Tests', () => {
     assert.strictEqual(body.latestVersion, '2.1.0');
     assert.strictEqual(body.currentVersion, '1.0');
     assert.strictEqual(body.releaseNotes, 'Release notes v2.1.0');
-    assert.strictEqual(body.apkUrl, 'https://github.com/03Chinmaya/MuE/releases/download/v2.1.0/app.apk');
+    assert.strictEqual(body.apkUrl, 'https://github.com/03Chinmaya/MuE-Air/releases/download/v2.1.0/app.apk');
     assert.strictEqual(body.apkSize, 15728640);
   });
 
