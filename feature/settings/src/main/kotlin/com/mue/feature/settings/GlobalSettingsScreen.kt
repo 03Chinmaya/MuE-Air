@@ -68,12 +68,12 @@ fun GlobalSettingsScreen(
         GlassAlertDialog(
             onDismissRequest = { showGuestDialogFor = null },
             title = {
-                Text("Sign In Required", color = PureWhite, fontWeight = FontWeight.Bold)
+                Text("Sign In Required", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
             },
             text = {
                 Text(
                     "Sign in to manage $showGuestDialogFor. Would you like to sign in now?",
-                    color = MutedGrey
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -83,12 +83,12 @@ fun GlobalSettingsScreen(
                         onNavigate("auth")
                     }
                 ) {
-                    Text("Sign In", color = PureWhite, fontWeight = FontWeight.Bold)
+                    Text("Sign In", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showGuestDialogFor = null }) {
-                    Text("Cancel", color = MutedGrey)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )

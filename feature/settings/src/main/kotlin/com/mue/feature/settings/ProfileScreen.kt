@@ -104,7 +104,7 @@ fun ProfileScreen(
         }
         GlassAlertDialog(
             onDismissRequest = { editDialogTarget = null },
-            title = { Text(title, color = PureWhite, fontWeight = FontWeight.Bold) },
+            title = { Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = editFieldValue,
@@ -112,13 +112,13 @@ fun ProfileScreen(
                     singleLine = editDialogTarget != "bio",
                     maxLines = if (editDialogTarget == "bio") 3 else 1,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        focusedBorderColor = PureWhite,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MutedGrey,
-                        cursorColor = PureWhite,
-                        focusedTextColor = PureWhite,
-                        unfocusedTextColor = PureWhite
+                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -133,12 +133,12 @@ fun ProfileScreen(
                         editDialogTarget = null
                     }
                 ) {
-                    Text("Save", color = PureWhite, fontWeight = FontWeight.Bold)
+                    Text("Save", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editDialogTarget = null }) {
-                    Text("Cancel", color = MutedGrey)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -148,11 +148,11 @@ fun ProfileScreen(
     if (showLogoutDialog) {
         GlassAlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Log Out", color = PureWhite, fontWeight = FontWeight.Bold) },
+            title = { Text("Log Out", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     text = "Are you sure you want to log out? Your local playback cache and preferences will be preserved, but online library sync will pause.",
-                    color = MutedGrey
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -169,7 +169,7 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Cancel", color = MutedGrey)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -179,11 +179,11 @@ fun ProfileScreen(
     if (showDeleteDialog) {
         GlassAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Account (GDPR)", color = PureWhite, fontWeight = FontWeight.Bold) },
+            title = { Text("Delete Account (GDPR)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     text = "This action is permanent and cannot be undone. All your synced playlists, playback history, and server credentials will be permanently erased in accordance with GDPR regulations.",
-                    color = MutedGrey
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -200,7 +200,7 @@ fun ProfileScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel", color = MutedGrey)
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -280,7 +280,7 @@ fun ProfileScreen(
                         text = effectiveDisplayName,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = PureWhite
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -396,7 +396,7 @@ private fun ProfileInteractiveRow(
     title: String,
     subtitle: String? = null,
     trailingText: String? = null,
-    accentColor: Color = PureWhite,
+    accentColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
     Row(
@@ -459,7 +459,7 @@ private fun RestoreIdentityDialog(
                 onDismiss()
             }
         },
-        title = { Text("Restore Identity (BIP39)", color = PureWhite, fontWeight = FontWeight.Bold) },
+        title = { Text("Restore Identity (BIP39)", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -512,15 +512,15 @@ private fun RestoreIdentityDialog(
                     enabled = !isRestoring,
                     isError = restoreErrorMessage != null,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                        disabledContainerColor = Color.White.copy(alpha = 0.02f),
-                        focusedBorderColor = PureWhite,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MutedGrey,
                         errorBorderColor = ErrorRed,
-                        cursorColor = PureWhite,
-                        focusedTextColor = PureWhite,
-                        unfocusedTextColor = PureWhite
+                        cursorColor = MaterialTheme.colorScheme.onSurface,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -562,7 +562,7 @@ private fun RestoreIdentityDialog(
             ) {
                 Text(
                     text = if (isRestoring) "Restoring..." else "Restore",
-                    color = if (!isRestoring && mnemonicInput.isNotBlank()) PureWhite else MutedGrey,
+                    color = if (!isRestoring && mnemonicInput.isNotBlank()) MaterialTheme.colorScheme.primary else MutedGrey,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -572,7 +572,7 @@ private fun RestoreIdentityDialog(
                 enabled = !isRestoring,
                 onClick = onDismiss
             ) {
-                Text("Cancel", color = MutedGrey)
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

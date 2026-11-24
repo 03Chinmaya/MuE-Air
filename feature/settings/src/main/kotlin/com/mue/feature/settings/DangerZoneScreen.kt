@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,7 +62,7 @@ fun ConfirmationDialog(
     title: String,
     message: String,
     confirmText: String = "Confirm",
-    confirmColor: Color = PureWhite,
+    confirmColor: Color = MaterialTheme.colorScheme.primary,
     dismissText: String = "Cancel",
     requireVerificationText: String? = null,
     onConfirm: () -> Unit,
@@ -74,16 +75,16 @@ fun ConfirmationDialog(
     GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(title, color = PureWhite, fontWeight = FontWeight.Bold)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
         },
         text = {
             Column {
-                Text(message, color = MutedGrey, style = MaterialTheme.typography.bodyMedium)
+                Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 if (requireVerificationText != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Type \"$requireVerificationText\" to confirm:",
-                        color = PureWhite,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -94,13 +95,13 @@ fun ConfirmationDialog(
                         singleLine = true,
                         placeholder = { Text(requireVerificationText, color = MutedGrey) },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White.copy(alpha = 0.05f),
-                            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                             focusedBorderColor = confirmColor,
                             unfocusedBorderColor = MutedGrey,
-                            cursorColor = PureWhite,
-                            focusedTextColor = PureWhite,
-                            unfocusedTextColor = PureWhite
+                            cursorColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -121,7 +122,7 @@ fun ConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(dismissText, color = MutedGrey)
+                Text(dismissText, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -174,7 +175,7 @@ fun DangerZoneScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .verticalScroll(scrollState)
     ) {
@@ -189,15 +190,17 @@ fun DangerZoneScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = PureWhite
+                    tint = MaterialTheme.colorScheme.onBackground
                 )
             }
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = "Danger Zone",
-                color = PureWhite,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                color = MaterialTheme.colorScheme.onBackground,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Black
+                )
             )
         }
 
@@ -222,7 +225,7 @@ fun DangerZoneScreen(
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
                     text = "Actions here perform destructive operations on local and cloud data. Please proceed with caution.",
-                    color = PureWhite,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium
                 )

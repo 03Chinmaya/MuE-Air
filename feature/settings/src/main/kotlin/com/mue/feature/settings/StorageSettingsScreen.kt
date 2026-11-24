@@ -211,7 +211,7 @@ fun StorageSettingsScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Audio Cache • $audioCacheFormatted",
-                            color = PureWhite,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -227,7 +227,7 @@ fun StorageSettingsScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Downloads • $downloadsFormatted",
-                            color = PureWhite,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -269,13 +269,13 @@ fun StorageSettingsScreen(
                 ) {
                     Text(
                         text = "Maximum Cache Size",
-                        color = PureWhite,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = formattedLimit,
-                        color = PureWhite,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -291,9 +291,9 @@ fun StorageSettingsScreen(
                     },
                     valueRange = minLimitMb.toFloat()..maxLimitMb.toFloat(),
                     colors = SliderDefaults.colors(
-                        thumbColor = PureWhite,
-                        activeTrackColor = PureWhite,
-                        inactiveTrackColor = DarkGrey
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )

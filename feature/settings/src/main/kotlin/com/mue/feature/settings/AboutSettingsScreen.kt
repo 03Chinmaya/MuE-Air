@@ -122,12 +122,12 @@ fun AboutSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Client Version", color = PureWhite, style = MaterialTheme.typography.bodyLarge)
+                        Text("Client Version", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                         Text("Android Application Package", color = MutedGrey, style = MaterialTheme.typography.bodySmall)
                     }
                     Text(
                         text = "v$clientVersion",
-                        color = PureWhite,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -141,12 +141,12 @@ fun AboutSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Server Version", color = PureWhite, style = MaterialTheme.typography.bodyLarge)
+                        Text("Server Version", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                         Text("Cloud API Gateway", color = MutedGrey, style = MaterialTheme.typography.bodySmall)
                     }
                     Text(
                         text = "v$serverVersion",
-                        color = PureWhite,
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -168,11 +168,11 @@ fun AboutSettingsScreen(
                     Icon(
                         imageVector = if (releaseChannel == "Stable") Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
                         contentDescription = "Stable",
-                        tint = if (releaseChannel == "Stable") PureWhite else MutedGrey
+                        tint = if (releaseChannel == "Stable") MaterialTheme.colorScheme.primary else MutedGrey
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Stable Channel", color = PureWhite, style = MaterialTheme.typography.bodyLarge)
+                        Text("Stable Channel", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                         Text("Production releases tested for stability and performance", color = MutedGrey, style = MaterialTheme.typography.bodySmall)
                     }
                 }

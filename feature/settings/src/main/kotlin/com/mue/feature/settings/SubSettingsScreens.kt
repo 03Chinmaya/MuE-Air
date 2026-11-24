@@ -181,10 +181,10 @@ fun PlaybackSettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Crossfade Duration", color = PureWhite, style = MaterialTheme.typography.bodyLarge)
+                    Text("Crossfade Duration", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
                     Text(
                         if (sliderSeconds.toInt() == 0) "Off" else "${sliderSeconds.toInt()}s",
-                        color = MutedGrey,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -195,9 +195,9 @@ fun PlaybackSettingsScreen(
                     valueRange = 0f..12f,
                     steps = 11,
                     colors = SliderDefaults.colors(
-                        thumbColor = PureWhite,
+                        thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = AccentRed,
-                        inactiveTrackColor = DarkGrey
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
             }
@@ -329,7 +329,7 @@ fun PrivacySettingsScreen(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(user, color = PureWhite, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        Text(user, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                         Text(
                             text = "Unblock",
                             color = AccentRed,
@@ -451,7 +451,7 @@ fun LinkedDevicesScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(device.name, color = PureWhite, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                            Text(device.name, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                             if (device.isCurrent) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Box(
