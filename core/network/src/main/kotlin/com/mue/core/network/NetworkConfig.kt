@@ -45,7 +45,7 @@ object NetworkConfig {
      */
     val candidateBaseUrls: List<String>
         get() = if (BuildConfig.DEBUG) {
-            listOf("http://10.0.2.2:4000", "http://10.0.2.2:3000", "https://mue-backend.onrender.com").distinct()
+            listOf("http://10.0.2.2:4000", "http://10.0.2.2:3000", "https://mue-air-api.onrender.com").distinct()
         } else {
             listOf(BuildConfig.API_BASE_URL)
         }

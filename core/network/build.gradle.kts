@@ -19,7 +19,7 @@ android {
             buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:4000\"")
         }
         release {
-            buildConfigField("String", "API_BASE_URL", "\"https://mue-backend.onrender.com\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://mue-air-api.onrender.com\"")
         }
     }
 
