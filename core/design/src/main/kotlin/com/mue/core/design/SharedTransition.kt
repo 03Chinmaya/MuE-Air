@@ -1,0 +1,27 @@
+package com.mue.core.design
+
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.Modifier
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+
+val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.sharedArtworkElement(key: String): Modifier {
+    val sharedScope = LocalSharedTransitionScope.current ?: return this
+    val animatedScope = LocalNavAnimatedVisibilityScope.current ?: return this
+    return with(sharedScope) {
+        this@sharedArtworkElement.sharedBounds(
+            rememberSharedContentState(key = key),
+            animatedVisibilityScope = animatedScope
+        )
+    }
+}
+

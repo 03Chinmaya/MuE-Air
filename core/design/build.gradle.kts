@@ -1,0 +1,35 @@
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.compose.compiler)
+}
+
+android {
+    namespace = "com.mue.core.design"
+    compileSdk = 35
+    defaultConfig { minSdk = 26 }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs = listOf("-Xskip-metadata-version-check")
+    }
+buildFeatures { compose = true }
+}
+
+dependencies {
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    api(libs.androidx.compose.animation)
+    implementation(libs.androidx.compose.material3)
+    api(libs.coil.compose)
+    api(libs.coil.network.okhttp)
+    api(libs.haze)
+    api(libs.haze.materials)
+    api(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "user_music_integrations" ADD COLUMN IF NOT EXISTS "access_token" text, ADD COLUMN IF NOT EXISTS "access_token_expires_at" timestamp with time zone, ADD COLUMN IF NOT EXISTS "spotify_user_id" text;

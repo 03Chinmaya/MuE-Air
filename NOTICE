@@ -1,0 +1,27 @@
+MuE-Air
+Copyright (C) 2026 MuE-Air Contributors
+
+This project is derived from MuE, originally created by the MuE project team
+and contributors.
+
+MuE-Air is licensed under the GNU General Public License v3.0 (GPL-3.0).
+A copy of the license is available in the LICENSE file in the root directory.
+
+Third-Party Notices and Acknowledgements:
+- Outfit Font:
+  Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)
+  Licensed under the SIL Open Font License, Version 1.1.
+  The full license text is included at core/design/src/main/res/raw/ofl.txt.
+
+- AndroidX, Jetpack Compose, Material3, Kotlin, Hono, Socket.io,
+  and related open source libraries are subject to their respective licenses.
+
+- InnerTubeX:
+  InnerTube request protocol and YouTube Music Web Remix client patterns.
+  Licensed under the GNU General Public License v3.0 (GPL-3.0).
+  https://github.com/metrolistgroup/InnerTubeX
+
+- InnerTune:
+  Client architecture and YouTube Music extractor reference by z-huang.
+  Licensed under the GNU General Public License v3.0 (GPL-3.0).
+  https://github.com/z-huang/InnerTune

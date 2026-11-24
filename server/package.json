@@ -1,0 +1,52 @@
+{
+  "name": "mue-air-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.14.0",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:setup": "tsx scripts/setup-roles.ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:rls": "tsx scripts/apply-rls.ts",
+    "restamp-migrations": "tsx scripts/restamp-migrations.ts",
+    "test": "tsx --env-file=.env --import ./tests/helpers/testEnv.ts --test --test-concurrency=4 --test-force-exit --experimental-test-coverage tests/*.test.ts",
+    "test:authdb-isolation": "tsx scripts/check-authdb-isolation.ts",
+    "//test-concurrency": "Note: tests run with --test-concurrency=4. Stateful tests require clean DB state (deferred fix: per-worker schema isolation)",
+    "test:e2e": "tsx --env-file=.env --import ./tests/helpers/testEnv.ts --test --test-concurrency=1 --test-force-exit tests/e2e/*.test.ts",
+    "load-test": "node tests/load/spike.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.3",
+    "@hono/zod-validator": "^0.9.1",
+    "@supabase/supabase-js": "^2.117.2",
+    "argon2": "^0.41.1",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.12",
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
+    "postgres": "^3.4.9",
+    "socket.io": "^4.8.4",
+    "youtubei.js": "^18.3.0",
+    "ytmusic-api": "^5.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.2",
+    "autocannon": "^8.0.0",
+    "drizzle-kit": "^0.31.11",
+    "socket.io-client": "^4.8.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "zod": ">=4.6.7"
+  }
+}

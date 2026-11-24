@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: mue-air-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: server
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: node dist/index.js
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_DIRECT
+        sync: false
+      - key: DATABASE_URL_AUTH
+        sync: false
+      - key: APP_USER_PASSWORD
+        sync: false
+      - key: AUTH_ROLE_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ISSUER
+        value: api.mue.app
+      - key: JWT_AUDIENCE
+        value: authenticated
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_TOKEN
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false

@@ -1,0 +1,91 @@
+# Node / Package managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native directories (managed workflow)
+/android/
+/ios/
+*.apk
+*.aab
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.keystore
+*.jks
+credentials.json
+local.properties
+google-services.json
+
+# IDE / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Documentation (Tracked)
+!docs/
+!docs/**
+*.md
+!README.md
+!docs/**/*.md
+.agents/
+android_assets/
+assets/*.bundle
+assets/*.bundle.meta
+
+# Test and verification artifacts
+artifacts/
+test_*.mp4
+test_*.png
+test_*.xml
+junit_*.xml
+.kotlin/
+emulator_*.png
+flash_*.png
+home_*.png
+p45_*.png
+p48_*.png
+p4_*.png
+p8_*.png
+p8_*.mp4
+playing*.png
+app_*.png
+android_*.png
+mini_now.png
+post_terms.png
+screen.png
+test_screen.png
+
+# Gradle
+.gradle/
+build/
+**/build/
+bin/
+**/bin/
+*.hprof
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Fonts raw files
+/fonts/
+

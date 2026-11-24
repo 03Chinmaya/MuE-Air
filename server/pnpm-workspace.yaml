@@ -1,0 +1,8 @@
+packages:
+  - '.'
+overrides:
+  zod: '>=4.6.7'
+allowBuilds:
+  '@biomejs/biome': false
+  argon2: true
+  esbuild: true

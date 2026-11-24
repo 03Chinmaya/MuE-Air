@@ -1,0 +1,32 @@
+appId: com.mue.app
+---
+- launchApp:
+    clearState: true
+
+# 1. Wait for the splash screen to finish and Auth Choice to appear
+- extendedWaitUntil:
+    visible:
+      id: "auth-choice-guest-btn"
+    timeout: 5000
+
+# 2. Tap "Continue as Guest"
+- tapOn:
+    id: "auth-choice-guest-btn"
+
+# 3. Wait for Home to load (Quick Picks section)
+- extendedWaitUntil:
+    visible:
+      id: "home-section-quick-picks"
+    timeout: 10000
+
+# 4. Tap the first track in Quick Picks
+- tapOn:
+    id: "home-section-quick-picks"
+    index: 0
+
+# 5. Verify the MiniPlayer appears to confirm audio playback started
+- extendedWaitUntil:
+    visible:
+      id: "mini-player"
+    timeout: 5000
+
