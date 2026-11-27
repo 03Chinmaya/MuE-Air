@@ -2,6 +2,7 @@ package com.mue.core.player
 
 import com.mue.core.datastore.SecureStore
 import com.mue.core.datastore.SettingsDataStore
+import com.mue.core.model.Track
 import com.mue.core.network.CreateSessionResult
 import com.mue.core.network.JoinSessionResult
 import com.mue.core.network.ListenApiClient
@@ -23,6 +24,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
+
+data class RoomChatMessage(
+    val userId: String,
+    val text: String,
+    val timestamp: Long
+)
+
+data class RoomReaction(
+    val userId: String,
+    val emoji: String,
+    val trackId: String,
+    val id: Long = System.nanoTime()
+)
 
 @Singleton
 class ListenTogetherService @Inject constructor(
@@ -80,6 +94,15 @@ class ListenTogetherService @Inject constructor(
 
     private val _joinViaLinkBehavior = MutableStateFlow("Ask first")
     val joinViaLinkBehaviorFlow: StateFlow<String> = _joinViaLinkBehavior.asStateFlow()
+
+    private val _chatMessages = MutableStateFlow<List<RoomChatMessage>>(emptyList())
+    val chatMessagesFlow: StateFlow<List<RoomChatMessage>> = _chatMessages.asStateFlow()
+
+    private val _reactions = MutableStateFlow<List<RoomReaction>>(emptyList())
+    val reactionsFlow: StateFlow<List<RoomReaction>> = _reactions.asStateFlow()
+
+    private val _isVoiceActive = MutableStateFlow(false)
+    val isVoiceActiveFlow: StateFlow<Boolean> = _isVoiceActive.asStateFlow()
 
     init {
         scope.launch {
@@ -165,6 +188,51 @@ class ListenTogetherService @Inject constructor(
                 _participantsCount.value = maxOf(1, _participantsCount.value - 1)
             }
         }
+
+        socketManager.onChatMessage { userId, text, timestamp ->
+            if (_currentRoomId.value != null) {
+                _chatMessages.value = (_chatMessages.value + RoomChatMessage(userId, text, timestamp)).takeLast(100)
+            }
+        }
+
+        socketManager.onReaction { userId, emoji, trackId ->
+            if (_currentRoomId.value != null) {
+                _reactions.value = (_reactions.value + RoomReaction(userId, emoji, trackId)).takeLast(12)
+            }
+        }
+
+        socketManager.onVoiceActive { _, isActive ->
+            if (_currentRoomId.value != null) {
+                _isVoiceActive.value = isActive
+                playerController.setVoiceDucking(isActive)
+            }
+        }
+    }
+
+    fun sendChatMessage(text: String) {
+        val roomId = _currentRoomId.value ?: return
+        val trimmed = text.trim()
+        if (trimmed.isNotBlank()) {
+            socketManager.emitChatMessage(roomId, trimmed)
+        }
+    }
+
+    fun sendReaction(emoji: String, trackId: String) {
+        val roomId = _currentRoomId.value ?: return
+        socketManager.emitReaction(roomId, emoji, trackId)
+    }
+
+    fun setVoiceActive(active: Boolean) {
+        val roomId = _currentRoomId.value ?: return
+        _isVoiceActive.value = active
+        playerController.setVoiceDucking(active)
+        socketManager.emitVoiceActive(roomId, active)
+    }
+
+    fun addTrackToRoom(track: Track) {
+        val roomId = _currentRoomId.value ?: return
+        playerController.addToUserQueue(track)
+        socketManager.emitQueueUpdate(roomId, track.title)
     }
 
     private suspend fun ensureSocketConnected() {

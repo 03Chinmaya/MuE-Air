@@ -1,21 +1,50 @@
 import os
+import hmac
 import json
 import logging
 import re
 import asyncio
 import difflib
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 import httpx
 import requests
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from ytmusicapi import YTMusic, OAuthCredentials
 
 # Configure basic logging without echoing sensitive request bodies
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("ytmusic-sidecar")
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="MuE YouTube Music Sidecar", version="1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_ytm_singleton: Optional[YTMusic] = None
+
+
+def get_ytm() -> YTMusic:
+    global _ytm_singleton
+    if not isinstance(YTMusic, type):
+        return YTMusic()
+    if _ytm_singleton is None:
+        _ytm_singleton = YTMusic()
+    return _ytm_singleton
+
+
+def require_secret(request: Request) -> None:
+    expected = os.environ.get("SIDECAR_SECRET", "")
+    env = os.environ.get("ENV", "dev").lower()
+    if env == "prod" and not expected:
+        raise HTTPException(status_code=503, detail="sidecar_misconfigured")
+    if expected:
+        provided = request.headers.get("X-Sidecar-Secret", "")
+        if not hmac.compare_digest(provided, expected):
+            raise HTTPException(status_code=401, detail="unauthorized")
 
 class PlaylistsRequest(BaseModel):
     refresh_token: str = Field(..., min_length=1, description="Encrypted-at-rest OAuth refresh token")
@@ -157,7 +186,12 @@ def readiness_check():
     return {"status": "ready"}
 
 @app.post("/library/playlists")
-def get_library_playlists(req: PlaylistsRequest) -> Dict[str, Any]:
+@limiter.limit("20/minute")
+def get_library_playlists(
+    request: Request,
+    req: PlaylistsRequest,
+    _: None = Depends(require_secret),
+) -> Dict[str, Any]:
     try:
         ytm = init_ytmusic(req.refresh_token, req.client_id, req.client_secret)
         try:
@@ -182,7 +216,12 @@ def get_library_playlists(req: PlaylistsRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail="playlist_fetch_failed") from None
 
 @app.post("/playlist/tracks")
-def get_playlist_tracks(req: PlaylistTracksRequest) -> Dict[str, Any]:
+@limiter.limit("20/minute")
+def get_playlist_tracks(
+    request: Request,
+    req: PlaylistTracksRequest,
+    _: None = Depends(require_secret),
+) -> Dict[str, Any]:
     if not req.playlist_id or not req.playlist_id.strip():
         raise HTTPException(status_code=400, detail="invalid_playlist_id")
 
@@ -197,7 +236,7 @@ def get_playlist_tracks(req: PlaylistTracksRequest) -> Dict[str, Any]:
         except Exception:
             # Fallback to unauthenticated YTMusic get_playlist for public/unlisted playlists
             try:
-                unauth_ytm = YTMusic()
+                unauth_ytm = get_ytm()
                 playlist = unauth_ytm.get_playlist(pid, limit=300)
                 if isinstance(playlist, dict):
                     raw_tracks = playlist.get("tracks", [])
@@ -224,7 +263,12 @@ def get_playlist_tracks(req: PlaylistTracksRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=502, detail="playlist_tracks_fetch_failed") from None
 
 @app.post("/playlist/public")
-def get_public_playlist(req: PublicPlaylistRequest) -> Dict[str, Any]:
+@limiter.limit("20/minute")
+def get_public_playlist(
+    request: Request,
+    req: PublicPlaylistRequest,
+    _: None = Depends(require_secret),
+) -> Dict[str, Any]:
     raw = req.playlist_url_or_id.strip()
     if not raw:
         raise HTTPException(status_code=400, detail="invalid_playlist_url_or_id")
@@ -235,7 +279,7 @@ def get_public_playlist(req: PublicPlaylistRequest) -> Dict[str, Any]:
         playlist_id = raw
 
     try:
-        ytm = YTMusic()
+        ytm = get_ytm()
         playlist = ytm.get_playlist(playlist_id, limit=300)
         raw_tracks = playlist.get("tracks", []) if isinstance(playlist, dict) else []
         normalized = [normalize_track(t) for t in raw_tracks if isinstance(t, dict)]
@@ -302,7 +346,12 @@ def resolve_spotify_track_to_ytm(
 
 
 @app.post("/spotify/private-playlist")
-async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Dict[str, Any]:
+@limiter.limit("20/minute")
+async def get_spotify_private_playlist(
+    request: Request,
+    req: SpotifyPrivatePlaylistRequest,
+    _: None = Depends(require_secret),
+) -> Dict[str, Any]:
     url = req.playlist_url.strip()
     match = re.search(r"(?:open\.spotify\.com/playlist/|spotify\.link/|spotify:playlist:)([a-zA-Z0-9]+)", url)
     if not match:
@@ -351,7 +400,7 @@ async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Di
 
             raw_items = data.get("tracks", {}).get("items", []) if isinstance(data.get("tracks"), dict) else []
             raw_items = raw_items[:300]
-            ytm_client = YTMusic()
+            ytm_client = get_ytm()
             tracks = []
             unresolved_count = 0
             consecutive_failures = 0

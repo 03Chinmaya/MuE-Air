@@ -160,6 +160,12 @@ class KtorAuthService @Inject constructor(
         }
     }
 
+    override suspend fun logout() {
+        NetworkConfig.executeWithFallback("/api/auth/logout") { fullUrl ->
+            httpClient.post(fullUrl)
+        }
+    }
+
     override suspend fun deleteAccount(): Boolean {
         val response: HttpResponse = NetworkConfig.executeWithFallback("/api/auth/account") { fullUrl ->
             httpClient.delete(fullUrl)

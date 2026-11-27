@@ -61,16 +61,8 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         prefs[CROSSFADE_SECONDS] ?: 0
     }
 
-    val automixFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[AUTOMIX] ?: false
-    }
-
     val skipSilenceFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[SKIP_SILENCE] ?: false
-    }
-
-    val spatialAudioFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[SPATIAL_AUDIO] ?: false
     }
 
     val reduceAnimationFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -151,24 +143,12 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         prefs[THEME] ?: "Pure Black OLED"
     }
 
-    val fontSizeFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[FONT_SIZE] ?: "Medium"
-    }
-
     val hideReadMarksFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[HIDE_READ_MARKS] ?: false
     }
 
     suspend fun setHideReadMarks(hide: Boolean) {
         context.dataStore.edit { prefs -> prefs[HIDE_READ_MARKS] = hide }
-    }
-
-    val appLanguageFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[APP_LANGUAGE] ?: "System Default"
-    }
-
-    suspend fun setAppLanguage(language: String) {
-        context.dataStore.edit { prefs -> prefs[APP_LANGUAGE] = language }
     }
 
     suspend fun setStreamingQuality(quality: String) {
@@ -205,10 +185,6 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
 
     suspend fun setTheme(theme: String) {
         context.dataStore.edit { prefs -> prefs[THEME] = theme }
-    }
-
-    suspend fun setFontSize(size: String) {
-        context.dataStore.edit { prefs -> prefs[FONT_SIZE] = size }
     }
 
     val cacheLimitMbFlow: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -273,21 +249,9 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         }
     }
 
-    suspend fun setAutomix(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[AUTOMIX] = enabled
-        }
-    }
-
     suspend fun setSkipSilence(enabled: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[SKIP_SILENCE] = enabled
-        }
-    }
-
-    suspend fun setSpatialAudio(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[SPATIAL_AUDIO] = enabled
         }
     }
 
@@ -717,18 +681,14 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         val IN_APP_BADGES = booleanPreferencesKey("in_app_badges")
         val DND_QUIET_HOURS = booleanPreferencesKey("dnd_quiet_hours")
         val DEVICE_HANDOFF = booleanPreferencesKey("device_handoff")
-        val FONT_SIZE = stringPreferencesKey("font_size")
         val HIDE_READ_MARKS = booleanPreferencesKey("hide_read_marks")
-        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val LOSSLESS_AUDIO = booleanPreferencesKey("lossless_audio")
         val DOWNLOAD_WIFI_ONLY = booleanPreferencesKey("download_wifi_only")
         val PREFER_MUSIC_ONLY = booleanPreferencesKey("prefer_music_only")
         val LOUDNESS_NORM = booleanPreferencesKey("loudness_norm")
         val CROSSFADE = booleanPreferencesKey("crossfade")
         val CROSSFADE_SECONDS = intPreferencesKey("crossfade_seconds")
-        val AUTOMIX = booleanPreferencesKey("automix")
         val SKIP_SILENCE = booleanPreferencesKey("skip_silence")
-        val SPATIAL_AUDIO = booleanPreferencesKey("spatial_audio")
         val REDUCE_ANIMATION = booleanPreferencesKey("reduce_animation")
         val REDUCE_DYNAMIC_BLUR = booleanPreferencesKey("reduce_dynamic_blur")
         val LIQUID_GLASS = booleanPreferencesKey("liquid_glass")

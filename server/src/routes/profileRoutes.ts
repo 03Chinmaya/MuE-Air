@@ -28,7 +28,15 @@ export const profileRoutes = new Hono<AppEnv>();
 
 profileRoutes.use('*', honoAuthMiddleware);
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://btgzkoofoyuyfgozgziq.supabase.co';
+const SUPABASE_URL = (() => {
+  const url = process.env.SUPABASE_URL?.trim();
+  if (!url) {
+    throw new Error(
+      'SUPABASE_URL is not configured. Set it in the server environment (Render dashboard → Environment).'
+    );
+  }
+  return url;
+})();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const AVATARS_BUCKET = 'avatars';
 

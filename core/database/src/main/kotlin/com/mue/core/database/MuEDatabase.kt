@@ -23,9 +23,10 @@ import androidx.room.RoomDatabase
         PlaybackHistoryEntity::class,
         ImportedPlaylistEntity::class,
         ImportedPlaylistTrackEntity::class,
-        FollowedArtistEntity::class
+        FollowedArtistEntity::class,
+        SearchHistoryEntity::class
     ],
-    version = 14,
+    version = 16,
     exportSchema = false
 )
 abstract class MuEDatabase : RoomDatabase() {
@@ -39,4 +40,5 @@ abstract class MuEDatabase : RoomDatabase() {
     abstract fun importedPlaylistTrackDao(): ImportedPlaylistTrackDao
     abstract fun syncDao(): SyncDao
     abstract fun followedArtistDao(): FollowedArtistDao
+    abstract fun searchHistoryDao(): SearchHistoryDao
 }

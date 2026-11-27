@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,7 +20,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,6 +46,7 @@ fun CategoryCard(
     modifier: Modifier = Modifier,
     isWide: Boolean = false,
     artworkPreviews: List<String> = emptyList(),
+    backdropArtworkUrl: String? = null,
     hazeState: HazeState? = null
 ) {
     val cardShape = RoundedCornerShape(18.dp)
@@ -52,8 +56,30 @@ fun CategoryCard(
             .liquidGlass(hazeState = hazeState, shape = cardShape)
             .applePressEffect()
             .clickable(onClick = onClick)
-            .padding(16.dp)
     ) {
+        if (!backdropArtworkUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backdropArtworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .matchParentSize()
+                    .alpha(0.35f)
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.75f)
+                            )
+                        )
+                    )
+            )
+        }
+        Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         if (isWide) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -120,7 +146,7 @@ fun CategoryCard(
             }
         } else {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
@@ -130,7 +156,7 @@ fun CategoryCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(if (MaterialTheme.colorScheme.background.luminance() > 0.5f) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
@@ -139,7 +165,7 @@ fun CategoryCard(
                             imageVector = icon,
                             contentDescription = title,
                             tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
@@ -154,7 +180,7 @@ fun CategoryCard(
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(32.dp)
+                                        .size(28.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(DarkGrey)
                                 )
@@ -163,7 +189,7 @@ fun CategoryCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Column {
                     Text(
@@ -184,6 +210,7 @@ fun CategoryCard(
                     )
                 }
             }
+        }
         }
     }
 }

@@ -44,6 +44,9 @@ import com.mue.feature.home.HomeScreen
 import com.mue.feature.library.CollectionDetailScreen
 import com.mue.feature.library.DownloadsScreen
 import com.mue.feature.library.HistoryScreen
+import com.mue.feature.library.ImportPlaylistScreen
+import com.mue.feature.library.LibraryAlbumsScreen
+import com.mue.feature.library.LibraryArtistsScreen
 import com.mue.feature.library.LibraryScreen
 import com.mue.feature.library.LibraryViewModel
 import com.mue.feature.library.LikedSongsScreen
@@ -78,6 +81,7 @@ fun MuENavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val playbackState by viewModel.state.collectAsState()
+    val isBuffering by viewModel.isBuffering.collectAsState()
     val currentQueue by viewModel.queue.collectAsState()
     val lyricsViewModel: LyricsViewModel = hiltViewModel()
     val currentLyricLine by lyricsViewModel.currentLine.collectAsState()
@@ -99,10 +103,10 @@ fun MuENavHost(
         }
     }
 
-    val showMiniPlayer = currentRoute?.startsWith("settings") != true &&
-        currentRoute != "listen_settings" &&
-        currentRoute != "profile" &&
-        playbackState.currentTrack != null
+    val showMiniPlayer = currentRoute != null &&
+        playbackState.currentTrack != null &&
+        !currentRoute.startsWith("settings") &&
+        currentRoute !in listOf("auth", "listen", "listen_together", "profile", "listen_settings", "full_player")
 
     SharedTransitionLayout {
         CompositionLocalProvider(LocalSharedTransitionScope provides this) {
@@ -124,6 +128,7 @@ fun MuENavHost(
                                         artist = track.artist,
                                         artworkUrl = track.artworkUrl,
                                         isPlaying = playbackState.isPlaying,
+                                        isBuffering = isBuffering,
                                         positionMs = playbackState.positionMs,
                                         durationMs = playbackState.durationMs,
                                         onPlayPause = { viewModel.togglePlayPause() },
@@ -159,11 +164,18 @@ fun MuENavHost(
                                             viewModel.playQueue(queue.ifEmpty { listOf(track) }, queue.indexOf(track).coerceAtLeast(0), source)
                                             showFullPlayer = true
                                         },
-                                        onPlaylistClick = { playlistTrack ->
+                                        onPlaylistClick = { playlistTrack, isImported ->
                                             val title = android.net.Uri.encode(playlistTrack.title)
                                             val art = android.net.Uri.encode(playlistTrack.artworkUrl ?: "")
                                             val author = android.net.Uri.encode(playlistTrack.artist)
-                                            navController.navigate("playlist/${playlistTrack.id}?title=$title&art=$art&author=$author&isImported=true")
+                                            navController.navigate("playlist/${playlistTrack.id}?title=$title&art=$art&author=$author&isImported=$isImported")
+                                        },
+                                        onAlbumClick = { albumTrack ->
+                                            val title = android.net.Uri.encode(albumTrack.title)
+                                            val art = android.net.Uri.encode(albumTrack.artworkUrl ?: "")
+                                            val artist = android.net.Uri.encode(albumTrack.artist)
+                                            val albumType = albumTrack.type ?: "album"
+                                            navController.navigate("album/${albumTrack.id}?title=$title&art=$art&artist=$artist&type=$albumType")
                                         },
                                         onNavigateToArtist = { routeOrId ->
                                             if (routeOrId.startsWith("artist/")) {
@@ -244,6 +256,22 @@ fun MuENavHost(
                                     DownloadsScreen(onBack = { navController.popBackStack() })
                                 }
                             }
+                            composable("library/cached") {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    DownloadsScreen(onBack = { navController.popBackStack() })
+                                }
+                            }
+                            composable("library/local_files") {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    val localPlayerVm: com.mue.feature.player.PlayerViewModel = hiltViewModel()
+                                    com.mue.feature.library.LocalFilesScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onPlayQueue = { tracks, index ->
+                                            localPlayerVm.playQueue(tracks, index, "Local Files")
+                                        }
+                                    )
+                                }
+                            }
                             composable("library/history") {
                                 CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
                                     HistoryScreen(onBack = { navController.popBackStack() })
@@ -264,6 +292,43 @@ fun MuENavHost(
                                             navController.navigate("playlist/${playlist.id}?title=$title&art=$art&isImported=$isImp")
                                         },
                                         onCreatePlaylist = { name -> libVm.createPlaylist(name) }
+                                    )
+                                }
+                            }
+                            composable("import_playlists") {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    ImportPlaylistScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onOpenPlaylist = { target ->
+                                            val title = android.net.Uri.encode(target.title)
+                                            val art = android.net.Uri.encode(target.art ?: "")
+                                            navController.navigate(
+                                                "collection/playlist/${target.id}?title=$title&art=$art&sub=Imported&isImported=true"
+                                            )
+                                        },
+                                        onNavigateToAuth = { navController.navigate("auth") }
+                                    )
+                                }
+                            }
+                            composable("library/albums") {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    LibraryAlbumsScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onOpenAlbum = { album ->
+                                            val albumId = album.tracks.firstOrNull()?.albumId ?: album.title
+                                            val title = android.net.Uri.encode(album.title)
+                                            val art = android.net.Uri.encode(album.artworkUrl ?: "")
+                                            val artist = android.net.Uri.encode(album.artist)
+                                            navController.navigate("album/$albumId?title=$title&art=$art&artist=$artist&type=album")
+                                        }
+                                    )
+                                }
+                            }
+                            composable("library/artists") {
+                                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@composable) {
+                                    LibraryArtistsScreen(
+                                        onBack = { navController.popBackStack() },
+                                        onOpenArtist = { artistId -> navController.navigate("artist/$artistId") }
                                     )
                                 }
                             }
@@ -539,6 +604,9 @@ fun MuENavHost(
                 ) {
                     CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this@AnimatedVisibility) {
                         val playbackPlayingFrom by viewModel.playingFrom.collectAsState()
+                        val isBuffering by viewModel.isBuffering.collectAsState()
+                        val playbackError by viewModel.playbackError.collectAsState()
+                        val tieredQueue by viewModel.tieredQueue.collectAsState()
                         val userPlaylists by viewModel.userPlaylists.collectAsState()
                         val isLiked by viewModel.isLiked.collectAsState()
                         playbackState.currentTrack?.let { track ->
@@ -549,9 +617,14 @@ fun MuENavHost(
                                 artworkUrl = track.artworkUrl,
                                 animatedArtworkUrl = track.animatedArtworkUrl,
                                 isPlaying = playbackState.isPlaying,
+                                isBuffering = isBuffering,
                                 positionMs = playbackState.positionMs,
                                 durationMs = playbackState.durationMs,
                                 queue = currentQueue,
+                                tieredQueue = tieredQueue,
+                                onJumpToTierItem = { tier, index -> viewModel.jumpToTierItem(tier, index) },
+                                onRemoveUserQueueItem = { index -> viewModel.removeUserQueueItem(index) },
+                                onRestoreUserQueueItem = { restored, index -> viewModel.restoreUserQueueItem(restored, index) },
                                 lyricsRepository = viewModel.lyricsRepository,
                                 currentLyricLine = currentLyricLine,
                                 onSeekTo = { viewModel.seekTo(it) },
@@ -590,6 +663,9 @@ fun MuENavHost(
                                 onSetSleepTimer = { minutes -> viewModel.setSleepTimer(minutes) },
                                 onSetPlaybackSpeed = { speed -> viewModel.setPlaybackSpeed(speed) },
                                 onSelectAudioDevice = { device -> viewModel.setPreferredAudioDevice(device) },
+                                playbackError = playbackError,
+                                onClearPlaybackError = { viewModel.clearPlaybackError() },
+                                onRetryPlayback = { viewModel.retryCurrentTrack() },
                                 onDismiss = { showFullPlayer = false }
                             )
                         }

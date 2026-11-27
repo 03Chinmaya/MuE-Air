@@ -1,5 +1,8 @@
 package com.mue.core.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Track(
     val id: String,
     val title: String,
@@ -12,6 +15,8 @@ data class Track(
     val youtubeVideoId: String? = null,
     val year: Int? = null,
     val language: String? = null,
+    val genre: String? = null,
+    val mood: String? = null,
     val type: String? = null,
     val videoType: String? = null,
     val artistChannelId: String? = null,

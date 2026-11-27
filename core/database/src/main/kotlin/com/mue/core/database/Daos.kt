@@ -48,6 +48,12 @@ interface AudioCacheDao {
     @Query("SELECT * FROM audio_cache ORDER BY lastAccessedAt ASC")
     suspend fun getAllSortedByLru(): List<AudioCacheEntity>
 
+    @Query("SELECT * FROM audio_cache ORDER BY lastAccessedAt DESC")
+    fun observeAllSortedByLru(): Flow<List<AudioCacheEntity>>
+
+    @Query("SELECT COUNT(*) FROM audio_cache")
+    fun observeCount(): Flow<Int>
+
     @Query("DELETE FROM audio_cache WHERE songId = :songId")
     suspend fun deleteBySongId(songId: String)
 
@@ -391,4 +397,25 @@ interface FollowedArtistDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM followed_artists WHERE artistId = :artistId)")
     suspend fun isFollowingSync(artistId: String): Boolean
+}
+
+@Dao
+interface SearchHistoryDao {
+    @Query("SELECT * FROM search_history ORDER BY lastPlayedAt DESC LIMIT 20")
+    fun observeRecent(): Flow<List<SearchHistoryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(item: SearchHistoryEntity)
+
+    @Query("DELETE FROM search_history WHERE query = :q")
+    suspend fun remove(q: String)
+
+    @Query("DELETE FROM search_history")
+    suspend fun clear()
+
+    @Query("SELECT COUNT(*) FROM search_history")
+    suspend fun count(): Int
+
+    @Query("DELETE FROM search_history WHERE query NOT IN (SELECT query FROM search_history ORDER BY lastPlayedAt DESC LIMIT 20)")
+    suspend fun trimTo20()
 }

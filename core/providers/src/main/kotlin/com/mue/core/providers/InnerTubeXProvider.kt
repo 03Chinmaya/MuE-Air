@@ -209,7 +209,8 @@ class InnerTubeXProvider @Inject constructor(
         val thumbnails = renderer["thumbnail"]?.jsonObject
             ?.get("musicThumbnailRenderer")?.jsonObject
             ?.get("thumbnail")?.jsonObject?.get("thumbnails")?.jsonArray
-        val artworkUrl = thumbnails?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
+        val rawUrl = thumbnails?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
+        val artworkUrl = upgradeYoutubeArtworkUrl(rawUrl)
 
         return Track(
             id = videoId,
@@ -468,5 +469,129 @@ class InnerTubeXProvider @Inject constructor(
             Log.w(TAG, "Error parsing playlist $playlistId: ${e.message}")
         }
         tracks
+    }
+
+    suspend fun getSearchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+        val escaped = query.replace("\"", "\\\"").replace("\n", " ").trim()
+        if (escaped.isBlank()) return@withContext emptyList()
+        val requestBody = """
+            {
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": "$CLIENT_VERSION",
+                        "hl": "en",
+                        "gl": "IN"
+                    }
+                },
+                "input": "$escaped"
+            }
+        """.trimIndent()
+
+        val root = postInnerTube("music/get_search_suggestions", requestBody) ?: return@withContext emptyList()
+        val suggestions = mutableListOf<String>()
+        try {
+            val contents = root["contents"]?.jsonArray ?: return@withContext emptyList()
+            for (section in contents) {
+                val items = section.jsonObject["searchSuggestionsSectionRenderer"]
+                    ?.jsonObject?.get("contents")?.jsonArray ?: continue
+                for (item in items) {
+                    val runs = item.jsonObject["searchSuggestionRenderer"]
+                        ?.jsonObject?.get("suggestion")
+                        ?.jsonObject?.get("runs")?.jsonArray
+                    val text = runs?.joinToString("") {
+                        it.jsonObject["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    }?.trim()
+                    if (!text.isNullOrBlank()) {
+                        suggestions.add(text)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing search suggestions for '$query': ${e.message}")
+        }
+        suggestions.distinct()
+    }
+
+    suspend fun getRadioPlaylist(videoId: String): List<Track> = withContext(Dispatchers.IO) {
+        val cleanId = videoId.trim()
+        if (cleanId.isBlank()) return@withContext emptyList()
+        val requestBody = """
+            {
+                "context": {
+                    "client": {
+                        "clientName": "WEB_REMIX",
+                        "clientVersion": "$CLIENT_VERSION",
+                        "hl": "en",
+                        "gl": "IN"
+                    }
+                },
+                "playlistId": "RDAMVM$cleanId"
+            }
+        """.trimIndent()
+
+        val root = postInnerTube("next", requestBody) ?: return@withContext emptyList()
+        val tracks = mutableListOf<Track>()
+        try {
+            val contents = root["contents"]?.jsonObject
+                ?.get("singleColumnMusicWatchNextResultsRenderer")?.jsonObject
+                ?.get("tabbedRenderer")?.jsonObject
+                ?.get("watchNextTabbedResultsRenderer")?.jsonObject
+                ?.get("tabs")?.jsonArray?.firstOrNull()?.jsonObject
+                ?.get("tabRenderer")?.jsonObject
+                ?.get("content")?.jsonObject
+                ?.get("musicQueueRenderer")?.jsonObject
+                ?.get("content")?.jsonObject
+                ?.get("playlistPanelRenderer")?.jsonObject
+                ?.get("contents")?.jsonArray ?: return@withContext emptyList()
+
+            for (item in contents) {
+                val renderer = item.jsonObject["playlistPanelVideoRenderer"]?.jsonObject ?: continue
+                val vid = renderer["videoId"]?.jsonPrimitive?.contentOrNull ?: continue
+                val title = renderer["title"]?.jsonObject?.get("runs")?.jsonArray
+                    ?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: continue
+                val artist = renderer["longBylineText"]?.jsonObject?.get("runs")?.jsonArray
+                    ?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: "Unknown Artist"
+                val rawThumb = renderer["thumbnail"]?.jsonObject?.get("thumbnails")?.jsonArray
+                    ?.lastOrNull()?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull
+                val thumb = upgradeYoutubeArtworkUrl(rawThumb)
+                val videoType = renderer["navigationEndpoint"]?.jsonObject
+                    ?.get("watchEndpoint")?.jsonObject
+                    ?.get("watchEndpointMusicSupportedConfigs")?.jsonObject
+                    ?.get("watchEndpointMusicConfig")?.jsonObject
+                    ?.get("musicVideoType")?.jsonPrimitive?.contentOrNull
+                val normalizedType = when {
+                    videoType?.contains("ATV") == true -> "ATV"
+                    videoType?.contains("OMV") == true -> "OMV"
+                    videoType?.contains("UGC") == true -> "UGC"
+                    else -> null
+                }
+                tracks.add(
+                    Track(
+                        id = vid,
+                        title = title,
+                        artist = artist,
+                        album = "",
+                        artworkUrl = thumb,
+                        durationMs = 0L,
+                        provider = ProviderId.YOUTUBE_MUSIC,
+                        youtubeVideoId = vid,
+                        videoType = normalizedType,
+                        isOfficial = normalizedType == "ATV" || normalizedType == "OMV"
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error parsing RDAMVM radio for '$videoId': ${e.message}")
+        }
+        tracks.filter { !ContentQualityFilter.shouldReject(it) }
+    }
+
+    private fun upgradeYoutubeArtworkUrl(rawUrl: String?): String? {
+        return rawUrl
+            ?.replace(Regex("=w\\d+-h\\d+"), "=w1200-h1200")
+            ?.replace("hqdefault.jpg", "maxresdefault.jpg")
+            ?.replace("mqdefault.jpg", "maxresdefault.jpg")
+            ?.replace("sddefault.jpg", "maxresdefault.jpg")
     }
 }

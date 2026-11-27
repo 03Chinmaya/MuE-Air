@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">mue-air-api.onrender.com</domain>
+        <!-- TODO(NEEDS-HUMAN): Add <pin-set expiration="2027-12-31"> with primary + backup SPKI SHA-256 pins for mue-air-api.onrender.com once backup pin is provisioned; fail-open until then -->
+    </domain-config>
     <debug-overrides>
         <trust-anchors>
             <certificates src="system" />

@@ -6,6 +6,7 @@ import com.mue.core.datastore.SecureStore
 import com.mue.core.datastore.SettingsDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -54,12 +55,7 @@ class DefaultAuthRepository @Inject constructor(
                 }
                 settingsDataStore.setIsGuest(true)
             } catch (e: Exception) {
-                val fallbackId = "guest_${java.util.UUID.randomUUID().toString().take(8)}"
-                secureStore.saveAccessToken(fallbackId)
-                secureStore.saveGuestToken(fallbackId)
-                tokenManager.saveAccessToken(fallbackId)
-                settingsDataStore.setUserId(fallbackId)
-                settingsDataStore.setGuestId(fallbackId)
+                android.util.Log.d("AuthRepository", "guest session offline: ${e.message}")
                 settingsDataStore.setIsGuest(true)
             }
         }
@@ -118,6 +114,9 @@ class DefaultAuthRepository @Inject constructor(
     override suspend fun getAccessToken(): String? = secureStore.getAccessToken() ?: tokenManager.getAccessToken()
 
     override suspend fun logout() {
+        withTimeoutOrNull(3000L) {
+            runCatching { authService.logout() }
+        }
         databaseWiper.wipeAllTables()
         secureStore.clearAll()
         tokenManager.clear()

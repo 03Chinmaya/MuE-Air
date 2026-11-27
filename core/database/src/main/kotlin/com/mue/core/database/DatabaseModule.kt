@@ -115,11 +115,37 @@ object DatabaseModule {
         }
     }
 
+    private val MIGRATION_14_15 = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS search_history (
+                    query TEXT NOT NULL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    subtitle TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    artworkUrl TEXT,
+                    id TEXT NOT NULL,
+                    timestamp INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+    private val MIGRATION_15_16 = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE search_history ADD COLUMN lastPlayedAt INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE search_history ADD COLUMN trackJson TEXT")
+            db.execSQL("UPDATE search_history SET lastPlayedAt = timestamp")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MuEDatabase =
         Room.databaseBuilder(context, MuEDatabase::class.java, "mue.db")
-            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+            .addMigrations(MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
             .build()
 
     @Provides
@@ -151,4 +177,7 @@ object DatabaseModule {
 
     @Provides
     fun provideFollowedArtistDao(db: MuEDatabase): FollowedArtistDao = db.followedArtistDao()
+
+    @Provides
+    fun provideSearchHistoryDao(db: MuEDatabase): SearchHistoryDao = db.searchHistoryDao()
 }

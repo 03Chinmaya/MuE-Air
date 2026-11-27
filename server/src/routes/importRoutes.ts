@@ -5,12 +5,17 @@
  */
 
 import { Hono } from 'hono';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/connection.js';
-import { importedPlaylists } from '../db/schema.js';
+import { importedPlaylists, users } from '../db/schema.js';
 import { AppEnv } from '../types.js';
+import { validateImportTarget } from '../util/validateImportTarget.js';
 
 export const importRoutes = new Hono<AppEnv>();
+
+if (process.env.NODE_ENV === 'production' && !process.env.SIDECAR_SECRET) {
+  throw new Error('SIDECAR_SECRET is required in production');
+}
 
 export interface ImportedTrack {
   videoId: string;
@@ -69,7 +74,10 @@ async function fetchFromSidecar<T>(endpoint: string, body?: any): Promise<T> {
     try {
       const res = await fetch(targetUrl, {
         method: body ? 'POST' : 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Sidecar-Secret': process.env.SIDECAR_SECRET ?? '',
+        },
         body: body ? JSON.stringify(body) : undefined,
         signal: (AbortSignal as any).timeout(90_000),
       });
@@ -108,10 +116,30 @@ importRoutes.post('/playlist', async (c) => {
     const userId = c.get('userId');
     if (tokenPayload?.is_guest === true && userId) {
       const reqDb = c.get('db') || db;
-      const countRows = await reqDb
-        .select({ count: sql<number>`count(*)::int` })
-        .from(importedPlaylists)
-        .where(eq(importedPlaylists.userId, userId));
+      const [guestRow] = await reqDb
+        .select({ deviceFingerprint: users.deviceFingerprint })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+
+      const deviceFp = guestRow?.deviceFingerprint;
+      const countRows = deviceFp
+        ? await reqDb
+            .select({ count: sql<number>`count(*)::int` })
+            .from(importedPlaylists)
+            .innerJoin(users, eq(users.id, importedPlaylists.userId))
+            .where(
+              and(
+                eq(users.deviceFingerprint, deviceFp),
+                eq(users.isGuest, true),
+                isNull(users.mergedInto)
+              )
+            )
+        : await reqDb
+            .select({ count: sql<number>`count(*)::int` })
+            .from(importedPlaylists)
+            .where(eq(importedPlaylists.userId, userId));
+
       const importCount = countRows[0]?.count ?? 0;
       if (importCount >= 5) {
         return c.json({ error: 'LOGIN_REQUIRED' }, 403);
@@ -124,7 +152,14 @@ importRoutes.post('/playlist', async (c) => {
       return c.json({ error: 'url or playlistId required' }, 400);
     }
 
-    const source = detectSource(target);
+    const v = validateImportTarget(target);
+    if (!v.ok) {
+      return c.json({ error: 'INVALID_URL', reason: v.reason }, 400);
+    }
+    const normalized = v.target;
+    const source = normalized.kind;
+    const sidecarTarget = normalized.cleanedUrl ?? normalized.playlistId;
+
     if (source === 'spotify') {
       if (!spDc) {
         return c.json({ error: 'SPOTIFY_COOKIE_REQUIRED' }, 400);
@@ -134,7 +169,7 @@ importRoutes.post('/playlist', async (c) => {
           title?: string;
           tracks?: ImportedTrack[];
           thumbnail?: string | null;
-        }>('/spotify/private-playlist', { playlist_url: target, sp_dc_cookie: spDc });
+        }>('/spotify/private-playlist', { playlist_url: sidecarTarget, sp_dc_cookie: spDc });
 
         return c.json({
           title: data.title || 'Imported Spotify Playlist',
@@ -158,7 +193,7 @@ importRoutes.post('/playlist', async (c) => {
       title?: string;
       tracks?: ImportedTrack[];
       thumbnail?: string | null;
-    }>('/playlist/public', { playlist_url_or_id: target });
+    }>('/playlist/public', { playlist_url_or_id: sidecarTarget });
 
     return c.json({
       title: data.title || 'Imported Playlist',

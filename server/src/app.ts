@@ -24,10 +24,18 @@ import { playlistRoutes } from './routes/playlistRoutes.js';
 import { settingsRoutes } from './routes/settingsRoutes.js';
 import { importRoutes } from './routes/importRoutes.js';
 import { updatesRoutes } from './routes/updatesRoutes.js';
+import { runGuestCleanup } from './jobs/guestCleanup.js';
 import { logger } from './lib/logger.js';
 import { AppEnv } from './types.js';
 
 export const app = new Hono<AppEnv>();
+
+if (process.env.NODE_ENV !== 'test' && process.env.ENABLE_GUEST_CLEANUP === 'true') {
+  const timer = setInterval(() => {
+    void runGuestCleanup();
+  }, 24 * 60 * 60 * 1000);
+  if (timer.unref) timer.unref();
+}
 
 // Request ID Middleware
 app.use('*', async (c, next) => {
@@ -257,7 +265,8 @@ app.get('/api/proxy/image', async (c) => {
       },
     });
   } catch (err: any) {
-    return c.json({ error: 'Proxy error', details: err?.message }, 502);
+    console.warn('[ProxyImage] Error:', err?.message ?? err);
+    return c.json({ error: 'Proxy error' }, 502);
   }
 });
 

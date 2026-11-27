@@ -512,12 +512,6 @@ class SyncManager @Inject constructor(
             prefs[SettingsDataStore.LOUDNESS_NORM]?.let {
                 localItems.add(CloudSettingDto("loudness_norm", JsonPrimitive(it)))
             }
-            prefs[SettingsDataStore.AUTOMIX]?.let {
-                localItems.add(CloudSettingDto("automix", JsonPrimitive(it)))
-            }
-            prefs[SettingsDataStore.SPATIAL_AUDIO]?.let {
-                localItems.add(CloudSettingDto("spatial_audio", JsonPrimitive(it)))
-            }
             prefs[SettingsDataStore.REDUCE_ANIMATION]?.let {
                 localItems.add(CloudSettingDto("reduce_animation", JsonPrimitive(it)))
             }
@@ -579,8 +573,6 @@ class SyncManager @Inject constructor(
                         "download_wifi_only" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.DOWNLOAD_WIFI_ONLY] = it }
                         "prefer_music_only" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.PREFER_MUSIC_ONLY] = it }
                         "loudness_norm" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.LOUDNESS_NORM] = it }
-                        "automix" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.AUTOMIX] = it }
-                        "spatial_audio" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.SPATIAL_AUDIO] = it }
                         "reduce_animation" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.REDUCE_ANIMATION] = it }
                         "reduce_dynamic_blur" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.REDUCE_DYNAMIC_BLUR] = it }
                         "liquid_glass" -> setting.value.jsonPrimitive.booleanOrNull?.let { prefs[SettingsDataStore.LIQUID_GLASS] = it }

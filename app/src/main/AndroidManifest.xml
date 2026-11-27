@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Required for in-app OTA APK install (see ApkDownloader). Reviewed in Phase 7 hygiene audit. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application

@@ -5,19 +5,25 @@ import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSink
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.CacheDataSink
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.offline.DownloadManager as Media3DownloadManager
+import com.mue.core.database.SongDao
 import com.mue.core.datastore.SettingsDataStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -79,12 +85,51 @@ object MediaCacheModule {
     @Singleton
     fun provideCacheDataSourceFactory(
         simpleCache: SimpleCache,
-        upstreamFactory: DataSource.Factory
+        upstreamFactory: DataSource.Factory,
+        songDao: SongDao
     ): CacheDataSource.Factory {
         return CacheDataSource.Factory()
             .setCache(simpleCache)
             .setUpstreamDataSourceFactory(upstreamFactory)
+            .setCacheWriteDataSinkFactory(ConditionalCacheDataSinkFactory(simpleCache, songDao))
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
+
+    private class ConditionalCacheDataSinkFactory(
+        private val cache: Cache,
+        private val songDao: SongDao
+    ) : DataSink.Factory {
+        override fun createDataSink(): DataSink {
+            return object : DataSink {
+                private val delegate = CacheDataSink(cache, CacheDataSink.DEFAULT_FRAGMENT_SIZE)
+                private var shouldCache = false
+
+                override fun open(dataSpec: DataSpec) {
+                    val key = dataSpec.key
+                    val playCount = if (!key.isNullOrBlank()) {
+                        runBlocking(Dispatchers.IO) {
+                            runCatching { songDao.getPlayCount(key) }.getOrNull() ?: 0
+                        }
+                    } else 0
+                    shouldCache = playCount >= 2
+                    if (shouldCache) {
+                        delegate.open(dataSpec)
+                    }
+                }
+
+                override fun write(buffer: ByteArray, offset: Int, length: Int) {
+                    if (shouldCache) {
+                        delegate.write(buffer, offset, length)
+                    }
+                }
+
+                override fun close() {
+                    if (shouldCache) {
+                        delegate.close()
+                    }
+                }
+            }
+        }
     }
 
     @Provides

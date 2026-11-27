@@ -5,6 +5,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.mue.core.datastore.SettingsDataStore
@@ -12,9 +13,13 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+
+enum class MergeStatus { IDLE, IN_PROGRESS, SUCCEEDED, FAILED }
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -81,5 +86,20 @@ class MergeWorker(
                 request
             )
         }
+
+        fun observeStatus(context: Context): Flow<MergeStatus> =
+            WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWorkFlow(WORK_NAME)
+                .map { infos ->
+                    when (infos.firstOrNull()?.state) {
+                        WorkInfo.State.ENQUEUED,
+                        WorkInfo.State.RUNNING,
+                        WorkInfo.State.BLOCKED -> MergeStatus.IN_PROGRESS
+                        WorkInfo.State.FAILED -> MergeStatus.FAILED
+                        WorkInfo.State.SUCCEEDED -> MergeStatus.SUCCEEDED
+                        WorkInfo.State.CANCELLED,
+                        null -> MergeStatus.IDLE
+                    }
+                }
     }
 }

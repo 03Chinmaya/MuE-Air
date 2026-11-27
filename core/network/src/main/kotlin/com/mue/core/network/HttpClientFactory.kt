@@ -1,7 +1,9 @@
 package com.mue.core.network
 
+import android.content.Context
 import com.mue.core.datastore.SecureStore
 import com.mue.core.datastore.SettingsDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -11,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,12 +21,23 @@ import javax.inject.Singleton
 @Singleton
 class HttpClientFactory @Inject constructor(
     private val secureStore: SecureStore?,
-    private val settingsDataStore: SettingsDataStore?
+    private val settingsDataStore: SettingsDataStore?,
+    @ApplicationContext private val appContext: Context? = null
 ) {
-    constructor() : this(null, null)
+    constructor() : this(null, null, null)
+
+    private val cache: okhttp3.Cache? by lazy {
+        appContext?.let {
+            okhttp3.Cache(
+                directory = File(it.cacheDir, "http_cache"),
+                maxSize = 50L * 1024 * 1024
+            )
+        }
+    }
 
     private val rawClient by lazy {
         okhttp3.OkHttpClient.Builder()
+            .apply { cache?.let { cache(it) } }
             .dns(ReliableDns)
             .connectTimeout(4000, TimeUnit.MILLISECONDS)
             .readTimeout(12000, TimeUnit.MILLISECONDS)
@@ -34,10 +48,29 @@ class HttpClientFactory @Inject constructor(
     fun create(): HttpClient = HttpClient(OkHttp) {
         engine {
             config {
+                cache?.let { cache(it) }
                 dns(ReliableDns)
                 connectTimeout(4000, TimeUnit.MILLISECONDS)
                 readTimeout(12000, TimeUnit.MILLISECONDS)
                 callTimeout(15000, TimeUnit.MILLISECONDS)
+                addNetworkInterceptor { chain ->
+                    val req = chain.request()
+                    val res = chain.proceed(req)
+                    val path = req.url.encodedPath
+                    val isCacheable = req.method.equals("GET", ignoreCase = true) && (
+                        path.startsWith("/api/playlists") ||
+                            path.startsWith("/api/home") ||
+                            path.startsWith("/api/artists") ||
+                            path.startsWith("/api/search")
+                        )
+                    if (isCacheable && res.isSuccessful) {
+                        res.newBuilder()
+                            .header("Cache-Control", "max-age=900, stale-while-revalidate=86400")
+                            .build()
+                    } else {
+                        res
+                    }
+                }
                 addInterceptor { chain ->
                     val original = chain.request()
                     val isLoopback = BuildConfig.DEBUG && (original.url.host == "10.0.2.2" || original.url.host == "localhost" || original.url.host == "127.0.0.1")

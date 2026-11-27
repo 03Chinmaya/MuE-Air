@@ -29,6 +29,8 @@ import com.mue.core.datastore.SettingsDataStore
 import com.mue.core.model.PlaybackState
 import com.mue.core.model.PlaybackRepeatMode
 import com.mue.core.model.ProviderId
+import com.mue.core.model.QueueTier
+import com.mue.core.model.TieredQueue
 import com.mue.core.model.Track
 import com.mue.core.providers.JioSaavnProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -84,8 +86,121 @@ class PlayerController @Inject constructor(
     private val _state = MutableStateFlow(PlaybackState())
     val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
+    private val _isBuffering = MutableStateFlow(false)
+    val isBuffering: StateFlow<Boolean> = _isBuffering.asStateFlow()
+
+    private val _playbackError = MutableStateFlow<String?>(null)
+    val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
+    fun clearPlaybackError() {
+        _playbackError.value = null
+    }
+
+    fun replayCurrent() {
+        val current = _state.value.currentTrack ?: return
+        _playbackError.value = null
+        playTrack(current, preserveTieredQueue = true, initialPositionMs = _state.value.positionMs)
+    }
+
+    private val _tieredQueue = MutableStateFlow(TieredQueue())
+    val tieredQueue: StateFlow<TieredQueue> = _tieredQueue.asStateFlow()
+
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
+    val flatQueue: StateFlow<List<Track>> = queue
+
+    private fun syncFlatQueueFromTiered() {
+        val flat = _tieredQueue.value.toFlatList()
+        _queue.value = flat
+        _state.value = _state.value.copy(queue = flat)
+    }
+
+    private fun syncTieredPosition(track: Track) {
+        val tq = _tieredQueue.value
+        val userIndex = tq.user.items.indexOfFirst { it.id == track.id }
+        val contextIndex = tq.context.items.indexOfFirst { it.id == track.id }
+        val autoIndex = tq.autoplay.items.indexOfFirst { it.id == track.id }
+        val newTier = when {
+            userIndex >= 0 -> TieredQueue.Tier.USER
+            contextIndex >= 0 -> TieredQueue.Tier.CONTEXT
+            autoIndex >= 0 -> TieredQueue.Tier.AUTOPLAY
+            else -> return
+        }
+        val newIndex = when (newTier) {
+            TieredQueue.Tier.USER -> userIndex
+            TieredQueue.Tier.CONTEXT -> contextIndex
+            TieredQueue.Tier.AUTOPLAY -> autoIndex
+        }
+        _tieredQueue.value = tq.copy(currentTier = newTier, currentIndex = newIndex)
+    }
+
+    fun playNextInUserQueue(track: Track) {
+        val tq = _tieredQueue.value
+        val updatedUser = listOf(track) + tq.user.items.filter { it.id != track.id }
+        _tieredQueue.value = tq.copy(user = QueueTier.User(updatedUser))
+        syncFlatQueueFromTiered()
+    }
+
+    fun addToUserQueue(track: Track) {
+        val tq = _tieredQueue.value
+        val updatedUser = tq.user.items.filter { it.id != track.id } + track
+        _tieredQueue.value = tq.copy(user = QueueTier.User(updatedUser))
+        syncFlatQueueFromTiered()
+    }
+
+    fun removeUserQueueItem(index: Int): Track? {
+        val tq = _tieredQueue.value
+        val items = tq.user.items.toMutableList()
+        if (index !in items.indices) return null
+        val removed = items.removeAt(index)
+        _tieredQueue.value = tq.copy(user = QueueTier.User(items))
+        syncFlatQueueFromTiered()
+        return removed
+    }
+
+    fun restoreUserQueueItem(track: Track, index: Int) {
+        val tq = _tieredQueue.value
+        val items = tq.user.items.toMutableList()
+        val safeIdx = index.coerceIn(0, items.size)
+        items.add(safeIdx, track)
+        _tieredQueue.value = tq.copy(user = QueueTier.User(items))
+        syncFlatQueueFromTiered()
+    }
+
+    fun jumpToTierItem(tier: TieredQueue.Tier, index: Int) {
+        val tq = _tieredQueue.value
+        when (tier) {
+            TieredQueue.Tier.CONTEXT -> {
+                val track = tq.context.items.getOrNull(index) ?: return
+                _tieredQueue.value = tq.copy(currentTier = TieredQueue.Tier.CONTEXT, currentIndex = index)
+                syncFlatQueueFromTiered()
+                playTrack(track, preserveTieredQueue = true)
+            }
+            TieredQueue.Tier.USER -> {
+                val track = tq.user.items.getOrNull(index) ?: return
+                val remainingUser = tq.user.items.drop(index + 1)
+                _tieredQueue.value = tq.copy(
+                    user = QueueTier.User(remainingUser),
+                    currentTier = TieredQueue.Tier.USER,
+                    currentIndex = 0
+                )
+                syncFlatQueueFromTiered()
+                playTrack(track, preserveTieredQueue = true)
+            }
+            TieredQueue.Tier.AUTOPLAY -> {
+                val track = tq.autoplay.items.getOrNull(index) ?: return
+                val pivotedContext = tq.autoplay.items.drop(index)
+                _tieredQueue.value = tq.copy(
+                    context = QueueTier.Context(pivotedContext, "Autoplay Radio"),
+                    autoplay = QueueTier.Autoplay(emptyList()),
+                    currentTier = TieredQueue.Tier.CONTEXT,
+                    currentIndex = 0
+                )
+                syncFlatQueueFromTiered()
+                playTrack(track, preserveTieredQueue = true)
+            }
+        }
+    }
 
     private val shuffleStrategy = QueueShuffleStrategy()
 
@@ -178,6 +293,7 @@ class PlayerController @Inject constructor(
     val playingFrom: StateFlow<String> = _playingFrom.asStateFlow()
 
     private var sleepTimerJob: kotlinx.coroutines.Job? = null
+    private var sessionTasteVector = SessionTasteVector()
     private val _sleepTimerMinutes = MutableStateFlow<Int?>(null)
     val sleepTimerMinutes: StateFlow<Int?> = _sleepTimerMinutes.asStateFlow()
     private var sleepWhenTrackEnds: Boolean = false
@@ -285,6 +401,7 @@ class PlayerController @Inject constructor(
         return MediaItem.Builder()
             .setMediaId(track.id)
             .setUri(mediaUri)
+            .setCustomCacheKey(track.id)
             .setMediaMetadata(mediaMetadata)
             .build()
     }
@@ -353,7 +470,8 @@ class PlayerController @Inject constructor(
                 try {
                     val candidates = queueRecommendationEngine.generateRadioCandidates(
                         seedTrack = current,
-                        recentTracks = currentQueue
+                        recentTracks = currentQueue,
+                        sessionTasteVector = sessionTasteVector
                     )
                     if (candidates.isNotEmpty()) {
                         withContext(Dispatchers.Main) {
@@ -361,8 +479,12 @@ class PlayerController @Inject constructor(
                                 _queue.value.none { it.id == candidate.id }
                             }
                             if (newTracks.isNotEmpty()) {
-                                _queue.value = _queue.value + newTracks
-                                _state.value = _state.value.copy(queue = _queue.value)
+                                _tieredQueue.value = _tieredQueue.value.copy(
+                                    autoplay = QueueTier.Autoplay(
+                                        _tieredQueue.value.autoplay.items + newTracks
+                                    )
+                                )
+                                syncFlatQueueFromTiered()
                             }
                         }
                     }
@@ -669,7 +791,13 @@ class PlayerController @Inject constructor(
                         currentTrackStartTime = System.currentTimeMillis()
                         hasTriggered80PercentPrefetch = false
 
-                        _state.value = _state.value.copy(currentTrack = matchedTrack, isPlaying = true)
+                        syncTieredPosition(matchedTrack)
+                        _state.value = _state.value.copy(
+                            currentTrack = matchedTrack,
+                            isPlaying = true,
+                            positionMs = 0L,
+                            durationMs = matchedTrack.durationMs
+                        )
                         notifyPlaybackChanged(matchedTrack, true)
                         persistPlaybackState()
 
@@ -699,6 +827,7 @@ class PlayerController @Inject constructor(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                _isBuffering.value = (playbackState == Player.STATE_BUFFERING)
                 if (playbackState == Player.STATE_ENDED || playbackState == Player.STATE_IDLE) {
                     releaseLoudnessEnhancer()
                 }
@@ -747,6 +876,7 @@ class PlayerController @Inject constructor(
 
             override fun onPlayerError(error: PlaybackException) {
                 android.util.Log.e("PlayerController", "ExoPlayer error [${error.errorCodeName}]: ${error.message}", error)
+                _playbackError.value = "Playback failed. Check your connection and retry."
                 if (error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                     error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
                 ) {
@@ -760,7 +890,7 @@ class PlayerController @Inject constructor(
         })
     }
 
-    fun playTrack(track: Track) {
+    fun playTrack(track: Track, preserveTieredQueue: Boolean = false, initialPositionMs: Long = 0L) {
         // Record fast skip / completion on previous track
         val prevHistoryId = currentHistoryId
         val prevPos = exoPlayer.currentPosition
@@ -781,12 +911,29 @@ class PlayerController @Inject constructor(
             }
         }
 
-        if (_queue.value.none { it.id == track.id }) {
+        if (!preserveTieredQueue && _tieredQueue.value.context.items.none { it.id == track.id }) {
+            _tieredQueue.value = _tieredQueue.value.copy(
+                context = QueueTier.Context(listOf(track), _playingFrom.value),
+                currentTier = TieredQueue.Tier.CONTEXT,
+                currentIndex = 0
+            )
+            syncFlatQueueFromTiered()
+        } else if (_queue.value.none { it.id == track.id }) {
             _queue.value = _queue.value + track
         }
         shuffleStrategy.recordPlayed(track)
+        originalVolume = 1.0f
+        if (exoPlayer.volume < 1.0f) {
+            exoPlayer.volume = 1.0f
+        }
         // Immediate optimistic UI update so MiniPlayer shows instantly on tap
-        _state.value = _state.value.copy(currentTrack = track, isPlaying = true, queue = _queue.value)
+        _state.value = _state.value.copy(
+            currentTrack = track,
+            isPlaying = true,
+            positionMs = initialPositionMs.coerceAtLeast(0L),
+            durationMs = track.durationMs,
+            queue = _queue.value
+        )
 
         scope.launch {
             val streamUrl = streamUrlResolver.resolve(track)
@@ -798,9 +945,17 @@ class PlayerController @Inject constructor(
 
                 exoPlayer.setMediaItem(mediaItem)
                 exoPlayer.prepare()
+                if (initialPositionMs > 0L) {
+                    exoPlayer.seekTo(initialPositionMs)
+                }
                 exoPlayer.playWhenReady = true
                 ensurePlaybackServiceStarted()
-                _state.value = _state.value.copy(currentTrack = track, isPlaying = true)
+                _state.value = _state.value.copy(
+                    currentTrack = track,
+                    isPlaying = true,
+                    positionMs = initialPositionMs.coerceAtLeast(0L),
+                    durationMs = track.durationMs
+                )
                 notifyPlaybackChanged(track, true)
                 persistPlaybackState()
 
@@ -839,7 +994,12 @@ class PlayerController @Inject constructor(
 
     fun playTrack(track: Track, streamUrl: String) {
         // Immediate optimistic UI update
-        _state.value = _state.value.copy(currentTrack = track, isPlaying = true)
+        _state.value = _state.value.copy(
+            currentTrack = track,
+            isPlaying = true,
+            positionMs = 0L,
+            durationMs = track.durationMs
+        )
         activeStreamUrl = streamUrl
         scope.launch {
             val localPath = withContext(Dispatchers.IO) {
@@ -879,7 +1039,12 @@ class PlayerController @Inject constructor(
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
             ensurePlaybackServiceStarted()
-            _state.value = _state.value.copy(currentTrack = track, isPlaying = true)
+            _state.value = _state.value.copy(
+                currentTrack = track,
+                isPlaying = true,
+                positionMs = 0L,
+                durationMs = track.durationMs
+            )
             notifyPlaybackChanged(track, true)
             persistPlaybackState()
 
@@ -906,6 +1071,19 @@ class PlayerController @Inject constructor(
         }
     }
 
+    private var originalVolume: Float = 1.0f
+
+    fun setVoiceDucking(active: Boolean) {
+        if (active) {
+            if (exoPlayer.volume > 0.2f) {
+                originalVolume = exoPlayer.volume
+            }
+            exoPlayer.volume = 0.2f
+        } else {
+            exoPlayer.volume = originalVolume.coerceAtLeast(0.5f)
+        }
+    }
+
     fun setMuted(muted: Boolean) {
         exoPlayer.volume = if (muted) 0f else 1f
     }
@@ -917,10 +1095,7 @@ class PlayerController @Inject constructor(
             if (exoPlayer.currentMediaItem == null && _state.value.currentTrack != null) {
                 val track = _state.value.currentTrack!!
                 val pos = _state.value.positionMs
-                playTrack(track)
-                if (pos > 0) {
-                    seekTo(pos)
-                }
+                playTrack(track, initialPositionMs = pos)
             } else {
                 exoPlayer.play()
             }
@@ -969,7 +1144,13 @@ class PlayerController @Inject constructor(
         if (tracks.isEmpty()) return
         _playingFrom.value = source
         val safeIndex = startIndex.coerceIn(0, tracks.lastIndex)
-        setQueue(tracks)
+        val tq = _tieredQueue.value
+        _tieredQueue.value = tq.copy(
+            context = QueueTier.Context(tracks, source),
+            currentTier = TieredQueue.Tier.CONTEXT,
+            currentIndex = safeIndex
+        )
+        syncFlatQueueFromTiered()
         playTrack(tracks[safeIndex])
     }
 
@@ -1004,6 +1185,9 @@ class PlayerController @Inject constructor(
     fun skipToNext() {
         val q = _queue.value
         val current = _state.value.currentTrack
+        if (current != null && exoPlayer.currentPosition in 1L..14_999L) {
+            sessionTasteVector = sessionTasteVector.penalize(current.artist)
+        }
         if (exoPlayer.hasNextMediaItem()) {
             exoPlayer.seekToNextMediaItem()
             exoPlayer.play()
@@ -1014,7 +1198,9 @@ class PlayerController @Inject constructor(
             } else {
                 if (currentIndex in 0 until q.size - 1) currentIndex + 1 else 0
             }
-            playTrack(q[nextIndex])
+            val nextTrack = q[nextIndex]
+            syncTieredPosition(nextTrack)
+            playTrack(nextTrack, preserveTieredQueue = true)
         }
         checkAndPrefetchQueue()
         prefetchLookaheadAudio()

@@ -18,6 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import com.mue.core.design.LocalTabReselectFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -47,15 +52,17 @@ fun MuELayout(
     content: @Composable (PaddingValues) -> Unit
 ) {
     val hazeState = remember { HazeState() }
+    val reselectFlow = remember { MutableSharedFlow<String>(extraBufferCapacity = 1) }
+    val coroutineScope = rememberCoroutineScope()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
     val tabs = remember {
         listOf(
-            BottomBarTab(route = "home",    icon = SfIcons.Home,                    label = "Home"),
-            BottomBarTab(route = "listen",  iconResId = R.drawable.ic_tab_listen,  label = "Listen"),
-            BottomBarTab(route = "search",  icon = SfIcons.Search,                  label = "Search"),
-            BottomBarTab(route = "library", iconResId = R.drawable.ic_tab_library, label = "Library"),
+            BottomBarTab(route = "home",    icon = SfIcons.Home,                                   label = "Home"),
+            BottomBarTab(route = "listen",  iconResId = com.mue.core.design.R.drawable.l_t,        label = "Listen"),
+            BottomBarTab(route = "search",  icon = SfIcons.Search,                                 label = "Search"),
+            BottomBarTab(route = "library", iconResId = com.mue.core.design.R.drawable.library,    label = "Library"),
         )
     }
 
@@ -67,7 +74,10 @@ fun MuELayout(
 
     val isRootTab = currentRoute in setOf(null, "home", "listen", "listen_together", "search", "library")
 
-    CompositionLocalProvider(LocalHazeState provides hazeState) {
+    CompositionLocalProvider(
+        LocalHazeState provides hazeState,
+        LocalTabReselectFlow provides reselectFlow.asSharedFlow()
+    ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -146,6 +156,10 @@ fun MuELayout(
                                             restoreState = true
                                         }
                                     }
+                                },
+                                onTabReselected = { index ->
+                                    val target = tabs[index].route
+                                    coroutineScope.launch { reselectFlow.emit(target) }
                                 },
                                 hazeState = hazeState
                             )

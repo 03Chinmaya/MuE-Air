@@ -90,6 +90,10 @@ function clearSocketRateLimits(socketId: string): void {
   rateLimitMap.delete(socketId);
 }
 
+function assertRoomMembership(socket: any, roomId: string): boolean {
+  return Boolean(roomId && socket.rooms.has(`listen:${roomId}`));
+}
+
 
 // Broadcast updated collaborative queue to session room
 export async function broadcastListenQueue(
@@ -727,7 +731,36 @@ export function initializeRealtimeServer(httpServer: HttpServer): Server {
       const userId = socket.data.userId;
       if (!userId) return;
       const roomId = msg?.roomId || msg?.sessionId || socket.data.sessionId || socket.data.joinCode;
-      if (!roomId) return;
+      if (!roomId || !assertRoomMembership(socket, roomId)) return;
+
+      const rateLimits: Record<string, number> = {
+        'chat:message': 5,
+        'chat:reaction': 10,
+        'voice:active': 5,
+      };
+      const limit = rateLimits[event] ?? 10;
+      if (!checkSocketRateLimit(socket.id, event, limit, 10_000)) {
+        socket.emit('error', {
+          type: 'error',
+          payload: { code: 'RATE_LIMITED', message: `Too many ${event} events` },
+          timestamp: Date.now(),
+        });
+        return;
+      }
+
+      if (event === 'chat:message') {
+        const rawText =
+          msg?.text ?? msg?.message ?? msg?.content ?? msg?.payload?.text ?? msg?.payload?.message;
+        if (typeof rawText !== 'string' || rawText.trim().length < 1 || rawText.length > 500) {
+          socket.emit('error', {
+            type: 'error',
+            payload: { code: 'INVALID_MESSAGE', message: 'Chat message must be 1 to 500 characters' },
+            timestamp: Date.now(),
+          });
+          return;
+        }
+      }
+
       const payload = { ...(msg?.payload || msg), userId, roomId, ...extra };
       io.to(`listen:${roomId}`).emit(event, payload);
       if (socket.data.sessionId && socket.data.sessionId !== roomId) {
@@ -864,6 +897,7 @@ export function initializeRealtimeServer(httpServer: HttpServer): Server {
     socket.on('sync_ping', (msg: any) => {
       const t0 = Number(msg?.t0 ?? msg?.payload?.t0 ?? Date.now());
       const roomId = msg?.roomId ?? msg?.sessionId ?? msg?.payload?.roomId ?? '';
+      if (roomId && !assertRoomMembership(socket, roomId)) return;
       socket.emit('sync_pong', {
         t0,
         t1: Date.now(),
@@ -880,15 +914,46 @@ export function initializeRealtimeServer(httpServer: HttpServer): Server {
 
     socket.on('sync_pong', (msg: any) => {
       const roomId = msg?.roomId ?? msg?.sessionId ?? '';
-      if (roomId) {
-        socket.to(`listen:${roomId}`).emit('sync_pong', msg);
-      }
+      if (!assertRoomMembership(socket, roomId)) return;
+      socket.to(`listen:${roomId}`).emit('sync_pong', msg);
     });
 
-    socket.on('queue_update', (msg: any) => {
+    socket.on('queue_update', async (msg: any) => {
+      const userId = socket.data.userId;
+      if (!userId) return;
       const roomId = msg?.roomId ?? msg?.sessionId ?? '';
-      if (roomId) {
-        io.to(`listen:${roomId}`).emit('queue_update', msg);
+      if (!assertRoomMembership(socket, roomId)) return;
+      const isUuid = UUID_REGEX.test(roomId);
+      try {
+        await withUserContext(userId, async (userDb) => {
+          const [session] = await userDb
+            .select({
+              id: listenSessions.id,
+              hostUserId: listenSessions.hostUserId,
+              controlMode: listenSessions.controlMode,
+            })
+            .from(listenSessions)
+            .where(
+              and(
+                isUuid ? eq(listenSessions.id, roomId) : eq(listenSessions.joinCode, roomId.toUpperCase()),
+                isNull(listenSessions.endedAt)
+              )
+            )
+            .limit(1);
+
+          if (!session) return;
+          if (session.controlMode === 'host-only' && session.hostUserId !== userId) {
+            socket.emit('error', {
+              type: 'error',
+              payload: { code: 'FORBIDDEN', message: 'Only host can update queue in host-only mode' },
+              timestamp: Date.now(),
+            });
+            return;
+          }
+          io.to(`listen:${roomId}`).emit('queue_update', msg);
+        });
+      } catch (err) {
+        console.warn('[SocketServer] Error in queue_update:', err);
       }
     });
 

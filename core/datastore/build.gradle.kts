@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
@@ -17,8 +18,16 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:database"))
+    implementation(project(":core:model"))
+    implementation(libs.kotlinx.serialization.json)
     api(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    testImplementation(libs.junit.jupiter)
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

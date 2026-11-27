@@ -5,9 +5,10 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +68,9 @@ import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.SharedFlow
+
+val LocalTabReselectFlow = staticCompositionLocalOf<SharedFlow<String>?> { null }
 
 data class BottomBarTab(
     val route: String,
@@ -83,12 +88,12 @@ data class BottomBarTab(
     )
 }
 
-internal val NAV_BAR_GUTTER = 24.dp
+internal val NAV_BAR_GUTTER = 16.dp
 internal val NAV_BAR_LIFT = 4.dp
 private val GESTURE_BAR_FLOOR = 12.dp
-internal val TAB_VERTICAL_PADDING = 4.5.dp
-internal val TAB_ICON_LABEL_GAP = 1.dp
-internal val TAB_ICON_SIZE = 22.dp
+internal val TAB_VERTICAL_PADDING = 9.dp
+internal val TAB_ICON_LABEL_GAP = 2.dp
+internal val TAB_ICON_SIZE = 28.dp
 internal val PILL_INSET = 3.dp
 
 internal val GlassSpring = spring<Float>(dampingRatio = 0.72f, stiffness = 320f)
@@ -102,6 +107,7 @@ fun FloatingBottomBar(
     onTabSelected: (Int) -> Unit,
     hazeState: HazeState,
     modifier: Modifier = Modifier,
+    onTabReselected: (Int) -> Unit = {},
 ) {
     val pillShape = RoundedCornerShape(percent = 50)
     val glassSpec: AnimationSpec<Float> = GlassSpring
@@ -272,20 +278,32 @@ fun FloatingBottomBar(
                     label = "tabTint",
                 )
 
+                @OptIn(ExperimentalFoundationApi::class)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
                         .weight(1f)
                         .clip(pillShape)
-                        .clickable(
+                        .combinedClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                        ) {
-                            if (!selected) {
+                            onClick = {
                                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (selected) {
+                                    onTabReselected(index)
+                                } else {
+                                    onTabSelected(index)
+                                }
+                            },
+                            onDoubleClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                if (selected) {
+                                    onTabReselected(index)
+                                } else {
+                                    onTabSelected(index)
+                                }
                             }
-                            onTabSelected(index)
-                        }
+                        )
                         .padding(vertical = TAB_VERTICAL_PADDING),
                 ) {
                     val iconModifier = Modifier
@@ -308,7 +326,12 @@ fun FloatingBottomBar(
                                 painter = painterResource(tab.iconResId),
                                 contentDescription = tab.label,
                                 tint = tint,
-                                modifier = iconModifier
+                                modifier = Modifier
+                                    .size(TAB_ICON_SIZE)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
                             )
                         }
                         tab.icon != null -> {
@@ -316,7 +339,12 @@ fun FloatingBottomBar(
                                 imageVector = tab.icon,
                                 contentDescription = tab.label,
                                 tint = tint,
-                                modifier = iconModifier
+                                modifier = Modifier
+                                    .size(TAB_ICON_SIZE)
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
                             )
                         }
                     }
@@ -324,7 +352,7 @@ fun FloatingBottomBar(
                     Text(
                         text = tab.label,
                         style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 9.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 0.4.sp,
                             shadow = if (isLight) null else Shadow(

@@ -14,11 +14,11 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CommandButton
-import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionResult
 import com.mue.core.datastore.SettingsDataStore
+import com.mue.core.player.notification.MuEMediaNotificationProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,10 +76,11 @@ class MuEPlaybackService : MediaSessionService() {
             notificationManager?.createNotificationChannel(channel)
         }
 
-        val notificationProvider = DefaultMediaNotificationProvider.Builder(this)
-            .setChannelId(CHANNEL_ID)
-            .setNotificationId(NOTIFICATION_ID)
-            .build()
+        val notificationProvider = MuEMediaNotificationProvider(
+            context = this,
+            channelId = CHANNEL_ID,
+            notificationId = NOTIFICATION_ID
+        )
         setMediaNotificationProvider(notificationProvider)
 
         val callback = object : MediaSession.Callback {
@@ -214,6 +215,18 @@ class MuEPlaybackService : MediaSessionService() {
         val session = sessionBuilder.build()
         mediaSession = session
         addSession(session)
+
+        playerController.exoPlayer.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                onUpdateNotification(session, isPlaying)
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY && playerController.exoPlayer.isPlaying) {
+                    onUpdateNotification(session, true)
+                }
+            }
+        })
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

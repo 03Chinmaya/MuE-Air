@@ -54,6 +54,7 @@ export const users = pgTable(
     ipAtCreation: inet('ip_at_creation'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     usernameChangedAt: timestamp('username_changed_at', { withTimezone: true }),
     usernameChangeCount: integer('username_change_count').default(0),
@@ -64,6 +65,7 @@ export const users = pgTable(
     index('idx_users_is_private').on(table.isPrivate),
     index('idx_users_merged_into').on(table.mergedInto),
     index('idx_users_device_fingerprint').on(table.deviceFingerprint),
+    // Partial unique index uq_users_active_guest_device on (device_fingerprint) WHERE is_guest = true AND merged_into IS NULL AND device_fingerprint IS NOT NULL defined in 0023_guest_hardening.sql
   ]
 );
 

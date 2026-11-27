@@ -244,6 +244,19 @@ data class FollowedArtistEntity(
     val followedAt: Long = System.currentTimeMillis()
 )
 
+@Entity(tableName = "search_history")
+data class SearchHistoryEntity(
+    @PrimaryKey val query: String,
+    val title: String,
+    val subtitle: String,
+    val type: String,
+    val artworkUrl: String? = null,
+    val id: String,
+    val timestamp: Long,
+    val lastPlayedAt: Long = timestamp,
+    val trackJson: String? = null
+)
+
 fun ImportedPlaylistTrackEntity.toTrack(): Track = Track(
     id = jiosaavnTrackId ?: providerTrackId,
     title = title,

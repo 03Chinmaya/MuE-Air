@@ -22,12 +22,16 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = file("release.keystore")
-            if (keystoreFile.exists()) {
+            val keystorePath = System.getenv("MU_AIR_KEYSTORE") ?: "release.keystore"
+            val keystoreFile = file(keystorePath)
+            val storePw = System.getenv("MU_AIR_STORE_PW")
+            val alias = System.getenv("MU_AIR_KEY_ALIAS") ?: "mueair"
+            val keyPw = System.getenv("MU_AIR_KEY_PW")
+            if (keystoreFile.exists() && !storePw.isNullOrBlank() && !keyPw.isNullOrBlank()) {
                 storeFile = keystoreFile
-                storePassword = "mueair123"
-                keyAlias = "mueair"
-                keyPassword = "mueair123"
+                storePassword = storePw
+                keyAlias = alias
+                keyPassword = keyPw
                 enableV1Signing = true
                 enableV2Signing = true
             }
@@ -36,11 +40,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (file("release.keystore").exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -118,4 +118,23 @@ dependencies {
     // REMOVED: libsignal-client, firebase-bom, firebase-messaging,
     //          glance-appwidget, glance-material3, biometric, unifiedpush,
     //          coreLibraryDesugaring
+}
+
+
+gradle.taskGraph.whenReady {
+    val isRelease = allTasks.any {
+        it.name.contains("Release") &&
+            (it.name.startsWith("assemble") || it.name.startsWith("package") || it.name.startsWith("bundle"))
+    }
+    if (isRelease) {
+        val keystorePath = System.getenv("MU_AIR_KEYSTORE") ?: "release.keystore"
+        val keystoreFile = file(keystorePath)
+        val storePw = System.getenv("MU_AIR_STORE_PW")
+        val keyPw = System.getenv("MU_AIR_KEY_PW")
+        if (!keystoreFile.exists() || storePw.isNullOrBlank() || keyPw.isNullOrBlank()) {
+            throw GradleException(
+                "Release signing requires a valid keystore ($keystorePath) and non-blank MU_AIR_STORE_PW and MU_AIR_KEY_PW environment variables."
+            )
+        }
+    }
 }

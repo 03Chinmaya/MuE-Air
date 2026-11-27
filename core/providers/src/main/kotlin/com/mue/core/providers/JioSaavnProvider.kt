@@ -206,8 +206,11 @@ class JioSaavnProvider @Inject constructor(
                                     } ?: "Unknown Artist"
                                 val artist = unescapeHtml(primaryArtist)
                                 val album = unescapeHtml(obj["album"]?.jsonPrimitive?.contentOrNull ?: "")
-                                val artwork = obj["artworkUrl"]?.jsonPrimitive?.contentOrNull
+                                val rawArtwork = obj["artworkUrl"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["thumbnail"]?.jsonPrimitive?.contentOrNull
+                                val artwork = rawArtwork
+                                    ?.replace("150x150.jpg", "500x500.jpg")
+                                    ?.replace("50x50.jpg", "500x500.jpg")
                                 val duration = obj["durationMs"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
                                     ?: (obj["duration"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()?.let { it * 1000 } ?: 0L)
                                 val language = obj["language"]?.jsonPrimitive?.contentOrNull?.trim()?.lowercase()

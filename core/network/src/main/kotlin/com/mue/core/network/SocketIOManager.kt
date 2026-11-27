@@ -373,6 +373,120 @@ class SocketIOManager @Inject constructor() {
         socket?.emit("queue_update", payload)
     }
 
+    fun emitChatMessage(roomId: String, text: String) {
+        val payload = mapOf(
+            "sessionId" to roomId,
+            "roomId" to roomId,
+            "text" to text,
+            "timestamp" to System.currentTimeMillis()
+        )
+        socket?.emit("chat:message", payload)
+    }
+
+    fun emitReaction(roomId: String, emoji: String, trackId: String) {
+        val payload = mapOf(
+            "sessionId" to roomId,
+            "roomId" to roomId,
+            "emoji" to emoji,
+            "trackId" to trackId
+        )
+        socket?.emit("chat:reaction", payload)
+    }
+
+    fun emitVoiceActive(roomId: String, isActive: Boolean) {
+        val payload = mapOf(
+            "sessionId" to roomId,
+            "roomId" to roomId,
+            "isActive" to isActive
+        )
+        socket?.emit("voice:active", payload)
+    }
+
+    fun onChatMessage(listener: (userId: String, text: String, timestamp: Long) -> Unit) {
+        val handler = Emitter.Listener { args ->
+            if (args.isNotEmpty()) {
+                val arg = args[0]
+                val userId: String
+                val text: String
+                val timestamp: Long
+                when (arg) {
+                    is JSONObject -> {
+                        val payload = arg.optJSONObject("payload") ?: arg
+                        userId = payload.optString("userId", payload.optString("senderId", "Guest"))
+                        text = payload.optString("text", "")
+                        timestamp = payload.optLong("timestamp", System.currentTimeMillis())
+                    }
+                    is Map<*, *> -> {
+                        val payload = (arg["payload"] as? Map<*, *>) ?: arg
+                        userId = (payload["userId"] as? String) ?: (payload["senderId"] as? String) ?: "Guest"
+                        text = (payload["text"] as? String) ?: ""
+                        timestamp = (payload["timestamp"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                    }
+                    else -> return@Listener
+                }
+                if (text.isNotBlank()) {
+                    listener(userId, text, timestamp)
+                }
+            }
+        }
+        addListener("chat:message", handler)
+    }
+
+    fun onReaction(listener: (userId: String, emoji: String, trackId: String) -> Unit) {
+        val handler = Emitter.Listener { args ->
+            if (args.isNotEmpty()) {
+                val arg = args[0]
+                val userId: String
+                val emoji: String
+                val trackId: String
+                when (arg) {
+                    is JSONObject -> {
+                        val payload = arg.optJSONObject("payload") ?: arg
+                        userId = payload.optString("userId", "Guest")
+                        emoji = payload.optString("emoji", "")
+                        trackId = payload.optString("trackId", "")
+                    }
+                    is Map<*, *> -> {
+                        val payload = (arg["payload"] as? Map<*, *>) ?: arg
+                        userId = (payload["userId"] as? String) ?: "Guest"
+                        emoji = (payload["emoji"] as? String) ?: ""
+                        trackId = (payload["trackId"] as? String) ?: ""
+                    }
+                    else -> return@Listener
+                }
+                if (emoji.isNotBlank()) {
+                    listener(userId, emoji, trackId)
+                }
+            }
+        }
+        addListener("chat:reaction", handler)
+    }
+
+    fun onVoiceActive(listener: (userId: String, isActive: Boolean) -> Unit) {
+        val handler = Emitter.Listener { args ->
+            if (args.isNotEmpty()) {
+                val arg = args[0]
+                val userId: String
+                val isActive: Boolean
+                when (arg) {
+                    is JSONObject -> {
+                        val payload = arg.optJSONObject("payload") ?: arg
+                        userId = payload.optString("userId", "Guest")
+                        isActive = payload.optBoolean("isActive", false)
+                    }
+                    is Map<*, *> -> {
+                        val payload = (arg["payload"] as? Map<*, *>) ?: arg
+                        userId = (payload["userId"] as? String) ?: "Guest"
+                        isActive = (payload["isActive"] as? Boolean) ?: false
+                    }
+                    else -> return@Listener
+                }
+                listener(userId, isActive)
+            }
+        }
+        addListener("voice:active", handler)
+    }
+
     fun onQueueUpdate(listener: (queueJson: String) -> Unit) {
         val handler = Emitter.Listener { args ->
             if (args.isNotEmpty()) {

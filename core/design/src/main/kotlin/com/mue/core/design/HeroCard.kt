@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -106,6 +107,7 @@ fun HeroCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     artworkPreviews: List<String> = emptyList(),
+    backdropArtworkUrl: String? = null,
     hazeState: HazeState? = null
 ) {
     val heroShape = RoundedCornerShape(18.dp)
@@ -115,10 +117,34 @@ fun HeroCard(
             .liquidGlass(hazeState = hazeState, shape = heroShape)
             .applePressEffect()
             .clickable(onClick = onClick)
-            .padding(16.dp)
     ) {
+        if (!backdropArtworkUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backdropArtworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.35f)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.75f)
+                            )
+                        )
+                    )
+            )
+        }
+
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(

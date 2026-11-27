@@ -42,6 +42,7 @@ import {
 import { sendWelcomeEmail, sendOtpEmail } from '../services/emailService.js';
 import { honoAuthMiddleware, requireAuth, requireAuthOrGuest } from '../middleware/honoAuth.js';
 import { mergeGuestIntoAuth } from '../services/guestMergeService.js';
+import { getClientIp } from '../lib/rateLimit.js';
 import { validateUsername } from '../utils/username.js';
 import { AppEnv } from '../types.js';
 
@@ -149,17 +150,14 @@ authRoutes.post(
   '/signup',
   zValidator('json', signupSchema, validationHook('Username and either password or PIN are required.')),
   async (c) => {
-    const forwarded = c.req.header('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',').pop()?.trim() : c.req.header('cf-connecting-ip');
-    if (ip) {
-      const rl = await checkRateLimit(ip);
-      if (!rl.allowed) {
-        return c.json(
-          { error: 'Too many authentication attempts. Please try again in 1 minute.' },
-          429,
-          { 'Retry-After': String(rl.retryAfter) }
-        );
-      }
+    const ip = getClientIp(c);
+    const rl = await checkRateLimit(ip);
+    if (!rl.allowed) {
+      return c.json(
+        { error: 'Too many authentication attempts. Please try again in 1 minute.' },
+        429,
+        { 'Retry-After': String(rl.retryAfter) }
+      );
     }
 
     try {
@@ -273,17 +271,14 @@ authRoutes.post(
   '/login',
   zValidator('json', loginSchema, validationHook('Username/email and credentials required.')),
   async (c) => {
-    const forwarded = c.req.header('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(',').pop()?.trim() : c.req.header('cf-connecting-ip');
-    if (ip) {
-      const rl = await checkRateLimit(ip);
-      if (!rl.allowed) {
-        return c.json(
-          { error: 'Too many authentication attempts. Please try again in 1 minute.' },
-          429,
-          { 'Retry-After': String(rl.retryAfter) }
-        );
-      }
+    const ip = getClientIp(c);
+    const rl = await checkRateLimit(ip);
+    if (!rl.allowed) {
+      return c.json(
+        { error: 'Too many authentication attempts. Please try again in 1 minute.' },
+        429,
+        { 'Retry-After': String(rl.retryAfter) }
+      );
     }
 
     try {
@@ -426,32 +421,77 @@ authRoutes.post(
       }
       if (clientIp === '') clientIp = null;
 
-      const [newUser] = await authDb
-        .insert(users)
-        .values({
-          username: guestUsername,
-          displayName: 'Guest',
-          isGuest: true,
-          deviceFingerprint: deviceFingerprintHash,
-          ipAtCreation: clientIp,
-        })
-        .returning();
+      let [guestUser] = await authDb
+        .select()
+        .from(users)
+        .where(
+          and(
+            eq(users.deviceFingerprint, deviceFingerprintHash),
+            eq(users.isGuest, true),
+            isNull(users.mergedInto)
+          )
+        )
+        .limit(1);
+
+      if (guestUser) {
+        await authDb
+          .update(users)
+          .set({ lastSeenAt: new Date(), updatedAt: new Date() })
+          .where(eq(users.id, guestUser.id));
+      } else {
+        try {
+          const [inserted] = await authDb
+            .insert(users)
+            .values({
+              username: guestUsername,
+              displayName: 'Guest',
+              isGuest: true,
+              deviceFingerprint: deviceFingerprintHash,
+              ipAtCreation: clientIp,
+              lastSeenAt: new Date(),
+            })
+            .returning();
+          guestUser = inserted;
+        } catch (insertErr: any) {
+          if (insertErr?.code === '23505') {
+            const [raced] = await authDb
+              .select()
+              .from(users)
+              .where(
+                and(
+                  eq(users.deviceFingerprint, deviceFingerprintHash),
+                  eq(users.isGuest, true),
+                  isNull(users.mergedInto)
+                )
+              )
+              .limit(1);
+            if (!raced) throw insertErr;
+            guestUser = raced;
+            await authDb
+              .update(users)
+              .set({ lastSeenAt: new Date(), updatedAt: new Date() })
+              .where(eq(users.id, guestUser.id));
+          } else {
+            throw insertErr;
+          }
+        }
+      }
 
       const [device] = await authDb
         .insert(userDevices)
         .values({
-          userId: newUser.id,
+          userId: guestUser.id,
           deviceName,
           platform,
           deviceFingerprintHash,
         })
         .returning();
 
-      const accessToken = generateGuestToken(newUser.id, device.id);
+      const accessToken = generateGuestToken(guestUser.id, device.id);
       const { token: refreshToken, hash: refreshHash, expiresAt: refreshExpiresAt } = generateRefreshToken();
 
       await authDb.insert(userSessions).values({
-        userId: newUser.id,
+        userId: guestUser.id,
         deviceId: device.id,
         refreshTokenHash: refreshHash,
         expiresAt: refreshExpiresAt,
@@ -461,7 +501,7 @@ authRoutes.post(
         accessToken,
         refreshToken,
         expiresIn: 86400,
-        userId: newUser.id,
+        userId: guestUser.id,
         isGuest: true,
       });
     } catch (err: any) {

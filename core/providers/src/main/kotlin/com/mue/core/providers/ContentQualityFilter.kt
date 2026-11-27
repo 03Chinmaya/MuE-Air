@@ -90,6 +90,22 @@ object ContentQualityFilter {
         return false
     }
 
+    fun inferLanguage(track: Track): String? {
+        val explicit = track.language?.trim()?.takeIf { it.isNotBlank() }
+        if (explicit != null) return explicit
+
+        val combined = "${track.title} ${track.artist} ${track.album.orEmpty()}"
+        for (lang in INDIAN_LANGUAGES) {
+            if (combined.contains(lang, ignoreCase = true)) {
+                return lang.replaceFirstChar { it.uppercase() }
+            }
+        }
+        if (INDIC_SCRIPT_REGEX.containsMatchIn(combined)) {
+            return "Hindi"
+        }
+        return null
+    }
+
     fun isAI(title: String?, artist: String? = null, album: String? = null): Boolean =
         (!title.isNullOrBlank() && AI_KEYWORDS_REGEX.containsMatchIn(title)) ||
         (!artist.isNullOrBlank() && AI_KEYWORDS_REGEX.containsMatchIn(artist)) ||

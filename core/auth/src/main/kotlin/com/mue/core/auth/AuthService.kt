@@ -9,6 +9,7 @@ interface AuthService {
     suspend fun guestSetup(deviceId: String, deviceName: String): AuthResponse
     suspend fun refresh(refreshToken: String): AuthResponse
     suspend fun mergeGuest(guestId: String, clientBatchId: String? = null): MergeGuestResponse
+    suspend fun logout()
     suspend fun deleteAccount(): Boolean
     suspend fun getLinkedDevices(): List<DeviceDto>
     suspend fun revokeDevice(deviceId: String): Boolean
