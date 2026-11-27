@@ -467,7 +467,7 @@ async function fetchFromInnertube(type: string, queryOrId: string = '', filter?:
         }
       }
 
-      if (filter === 'playlists') {
+      if (filter === 'playlists' || filter === 'community_playlists' || filter === 'featured_playlists') {
         let playlists: any[] = [];
         try {
           const plRes: any = await (yt.music as any).search(queryOrId, { type: 'playlist' });
@@ -1161,7 +1161,7 @@ async function fetchFromYtmusicApi(type: string, queryOrId: string = '', filter?
   try {
     const ytm = await getYtMusicApi();
     if (type === 'search') {
-      if (filter === 'playlists') {
+      if (filter === 'playlists' || filter === 'community_playlists' || filter === 'featured_playlists') {
         const plList = await ytm.searchPlaylists(queryOrId).catch(() => []);
         const playlists = (plList || []).slice(0, 30).map((p: any) => ({
           id: p.playlistId || p.id,

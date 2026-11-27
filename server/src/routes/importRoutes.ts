@@ -5,6 +5,9 @@
  */
 
 import { Hono } from 'hono';
+import { eq, sql } from 'drizzle-orm';
+import { db } from '../db/connection.js';
+import { importedPlaylists } from '../db/schema.js';
 import { AppEnv } from '../types.js';
 
 export const importRoutes = new Hono<AppEnv>();
@@ -12,7 +15,7 @@ export const importRoutes = new Hono<AppEnv>();
 export interface ImportedTrack {
   videoId: string;
   title: string;
-  artists: string[];
+  artists: string[] | string;
   album: string | null;
   durationMs: number;
   thumbnail?: string | null;
@@ -24,33 +27,131 @@ export interface ImportedPlaylist {
   thumbnail?: string | null;
 }
 
+export class SidecarHttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+export function detectSource(url: string): 'spotify' | 'youtube' {
+  const lower = url.toLowerCase();
+  if (
+    lower.includes('open.spotify.com/') ||
+    lower.includes('spotify.link/') ||
+    lower.includes('spotify:playlist:')
+  ) {
+    return 'spotify';
+  }
+  return 'youtube';
+}
+
+function normalizeSidecarTracks(tracks: any[]) {
+  return tracks.map((t: any) => ({
+    videoId: t.videoId || '',
+    title: t.title || 'Unknown',
+    artists: Array.isArray(t.artists) ? t.artists.join(', ') : (t.artists || 'Unknown Artist'),
+    album: t.album || null,
+    durationMs: t.durationMs || 0,
+    artworkUrl: t.artworkUrl || t.thumbnail || null,
+  }));
+}
+
 async function fetchFromSidecar<T>(endpoint: string, body?: any): Promise<T> {
   const sidecarBaseUrl = process.env.YTMUSIC_SIDECAR_URL;
   if (!sidecarBaseUrl) {
     throw new Error('YTMUSIC_SIDECAR_URL not configured for playlist import');
   }
 
-  const res = await fetch(`${sidecarBaseUrl.replace(/\/$/, '')}${endpoint}`, {
-    method: body ? 'POST' : 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: (AbortSignal as any).timeout(30000),
-  });
+  const targetUrl = `${sidecarBaseUrl.replace(/\/$/, '')}${endpoint}`;
+  let lastError: unknown;
 
-  if (!res.ok) {
-    throw new Error(`Sidecar import failed: HTTP ${res.status}`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(targetUrl, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: (AbortSignal as any).timeout(90_000),
+      });
+
+      if (!res.ok) {
+        throw new SidecarHttpError(res.status, `Sidecar import failed: HTTP ${res.status}`);
+      }
+
+      return (await res.json()) as T;
+    } catch (err: any) {
+      if (err instanceof SidecarHttpError) {
+        throw err;
+      }
+      lastError = err;
+      const isTimeoutOrNetwork =
+        err?.name === 'TimeoutError' ||
+        err?.name === 'AbortError' ||
+        err?.code === 'ECONNRESET' ||
+        err?.code === 'ETIMEDOUT' ||
+        err?.cause?.code === 'ECONNRESET' ||
+        err?.cause?.code === 'ETIMEDOUT';
+      if (attempt === 0 && isTimeoutOrNetwork) {
+        continue;
+      }
+      throw err;
+    }
   }
 
-  return res.json() as Promise<T>;
+  throw lastError;
 }
 
 // Import public playlist by URL or ID
 importRoutes.post('/playlist', async (c) => {
   try {
-    const { url, playlistId } = await c.req.json<{ url?: string; playlistId?: string }>();
+    const tokenPayload = c.get('tokenPayload');
+    const userId = c.get('userId');
+    if (tokenPayload?.is_guest === true && userId) {
+      const reqDb = c.get('db') || db;
+      const countRows = await reqDb
+        .select({ count: sql<number>`count(*)::int` })
+        .from(importedPlaylists)
+        .where(eq(importedPlaylists.userId, userId));
+      const importCount = countRows[0]?.count ?? 0;
+      if (importCount >= 5) {
+        return c.json({ error: 'LOGIN_REQUIRED' }, 403);
+      }
+    }
+
+    const { url, playlistId, spDc } = await c.req.json<{ url?: string; playlistId?: string; spDc?: string }>();
     const target = url || playlistId;
     if (!target) {
       return c.json({ error: 'url or playlistId required' }, 400);
+    }
+
+    const source = detectSource(target);
+    if (source === 'spotify') {
+      if (!spDc) {
+        return c.json({ error: 'SPOTIFY_COOKIE_REQUIRED' }, 400);
+      }
+      try {
+        const data = await fetchFromSidecar<{
+          title?: string;
+          tracks?: ImportedTrack[];
+          thumbnail?: string | null;
+        }>('/spotify/private-playlist', { playlist_url: target, sp_dc_cookie: spDc });
+
+        return c.json({
+          title: data.title || 'Imported Spotify Playlist',
+          tracks: normalizeSidecarTracks(data.tracks || []),
+          thumbnail: data.thumbnail || null,
+        });
+      } catch (err: any) {
+        if (err instanceof SidecarHttpError) {
+          if (err.status === 400 || err.status === 422) {
+            return c.json({ error: 'SPOTIFY_AUTH_FAILED' }, 400);
+          }
+          if (err.status >= 500) {
+            return c.json({ error: 'SIDECAR_ERROR' }, 502);
+          }
+        }
+        return c.json({ error: 'SIDECAR_ERROR' }, 502);
+      }
     }
 
     const data = await fetchFromSidecar<{
@@ -61,7 +162,7 @@ importRoutes.post('/playlist', async (c) => {
 
     return c.json({
       title: data.title || 'Imported Playlist',
-      tracks: data.tracks || [],
+      tracks: normalizeSidecarTracks(data.tracks || []),
       thumbnail: data.thumbnail || null,
     });
   } catch (err: any) {

@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import re
+import asyncio
+import difflib
 from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -255,6 +257,50 @@ def get_public_playlist(req: PublicPlaylistRequest) -> Dict[str, Any]:
         logger.warning("Public playlist fetch failed (type: %s)", type(exc).__name__)
         raise HTTPException(status_code=502, detail="public_playlist_fetch_failed") from None
 
+def resolve_spotify_track_to_ytm(
+    title: str,
+    artists: List[str],
+    duration_ms: int,
+    ytm_client: Optional[YTMusic] = None,
+) -> Optional[str]:
+    primary_artist = artists[0] if artists else ""
+    query = f"{title} {primary_artist}".strip()
+    if not query:
+        return None
+
+    client = ytm_client or YTMusic()
+    results = client.search(query, filter="songs", limit=5) or []
+    best_vid: Optional[str] = None
+    best_ratio = 0.0
+
+    for cand in results:
+        if not isinstance(cand, dict):
+            continue
+        vid = cand.get("videoId")
+        cand_title = str(cand.get("title") or "")
+        if not vid or not cand_title:
+            continue
+
+        ratio = difflib.SequenceMatcher(None, title.lower(), cand_title.lower()).ratio()
+        if ratio < 0.75:
+            continue
+
+        cand_dur_s = cand.get("duration_seconds")
+        if duration_ms > 0 and cand_dur_s is not None:
+            try:
+                cand_dur_ms = int(cand_dur_s) * 1000
+                if abs(cand_dur_ms - duration_ms) > 4000:
+                    continue
+            except (ValueError, TypeError):
+                pass
+
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best_vid = str(vid)
+
+    return best_vid
+
+
 @app.post("/spotify/private-playlist")
 async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Dict[str, Any]:
     url = req.playlist_url.strip()
@@ -304,8 +350,13 @@ async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Di
             playlist_thumb = p_images[0].get("url") if isinstance(p_images, list) and p_images else None
 
             raw_items = data.get("tracks", {}).get("items", []) if isinstance(data.get("tracks"), dict) else []
+            raw_items = raw_items[:300]
+            ytm_client = YTMusic()
             tracks = []
-            for item in raw_items:
+            unresolved_count = 0
+            consecutive_failures = 0
+
+            for idx, item in enumerate(raw_items):
                 if not isinstance(item, dict):
                     continue
                 track_obj = item.get("track")
@@ -323,9 +374,28 @@ async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Di
                 album_images = track_obj.get("album", {}).get("images") or []
                 t_thumb = album_images[0].get("url") if isinstance(album_images, list) and album_images else None
 
+                if consecutive_failures >= 3:
+                    unresolved_count += 1
+                    continue
+
+                try:
+                    resolved_vid = await asyncio.wait_for(
+                        asyncio.to_thread(resolve_spotify_track_to_ytm, t_name, artists, duration_ms, ytm_client),
+                        timeout=5.0,
+                    )
+                except Exception:
+                    resolved_vid = None
+
+                if not resolved_vid:
+                    unresolved_count += 1
+                    consecutive_failures += 1
+                    continue
+
+                consecutive_failures = 0
                 tracks.append({
                     "externalId": tid,
-                    "videoId": tid,
+                    "videoId": resolved_vid,
+                    "spotifyTrackId": tid,
                     "title": t_name,
                     "artists": artists,
                     "album": album_name,
@@ -340,6 +410,7 @@ async def get_spotify_private_playlist(req: SpotifyPrivatePlaylistRequest) -> Di
                 "thumbnail": playlist_thumb,
                 "thumbnailUrl": playlist_thumb,
                 "tracks": tracks,
+                "unresolvedCount": unresolved_count,
             }
     except HTTPException:
         raise

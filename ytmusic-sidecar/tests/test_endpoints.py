@@ -214,3 +214,81 @@ def test_spotify_private_playlist_invalid_cookie():
     })
     assert res.status_code == 400
     assert res.json()["detail"] == "invalid_spotify_cookie"
+
+
+@patch("main.YTMusic")
+def test_spotify_resolver_match_and_duration_filter(mock_ytm_cls):
+    from main import resolve_spotify_track_to_ytm
+
+    mock_inst = MagicMock()
+    mock_inst.search.return_value = [
+        {"videoId": "wrong_dur", "title": "Kesariya", "duration_seconds": 300},
+        {"videoId": "ytm_kesariya_123", "title": "Kesariya", "duration_seconds": 268},
+    ]
+    vid = resolve_spotify_track_to_ytm("Kesariya", ["Arijit Singh"], 268_000, ytm_client=mock_inst)
+    assert vid == "ytm_kesariya_123"
+
+
+@patch("main.YTMusic")
+@patch("main.httpx.AsyncClient")
+def test_spotify_private_playlist_resolver_miss_increments_unresolved_count(mock_async_client_cls, mock_ytm_cls):
+    token_resp = MagicMock(status_code=200)
+    token_resp.json.return_value = {"accessToken": "tok123", "isAnonymous": False}
+
+    pl_resp = MagicMock(status_code=200)
+    pl_resp.json.return_value = {
+        "name": "My Mix",
+        "images": [{"url": "https://img.example/pl.jpg"}],
+        "tracks": {
+            "items": [
+                {
+                    "track": {
+                        "id": "sp_1",
+                        "name": "Matched Song",
+                        "artists": [{"name": "Artist A"}],
+                        "album": {"name": "Alb", "images": []},
+                        "duration_ms": 200_000,
+                    }
+                },
+                {
+                    "track": {
+                        "id": "sp_2",
+                        "name": "Obscure Unmatched Track",
+                        "artists": [{"name": "Artist B"}],
+                        "album": {"name": "Alb", "images": []},
+                        "duration_ms": 200_000,
+                    }
+                },
+            ]
+        },
+    }
+
+    mock_client = MagicMock()
+    async def fake_get(url, **kwargs):
+        return token_resp if "get_access_token" in url else pl_resp
+    mock_client.get = fake_get
+
+    mock_cm = MagicMock()
+    async def aenter(*args): return mock_client
+    async def aexit(*args): return False
+    mock_cm.__aenter__ = aenter
+    mock_cm.__aexit__ = aexit
+    mock_async_client_cls.return_value = mock_cm
+
+    mock_ytm = MagicMock()
+    mock_ytm.search.side_effect = [
+        [{"videoId": "ytm_ok_1", "title": "Matched Song", "duration_seconds": 200}],
+        [],
+    ]
+    mock_ytm_cls.return_value = mock_ytm
+
+    res = client.post("/spotify/private-playlist", json={
+        "playlist_url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
+        "sp_dc_cookie": "valid_sp_dc"
+    })
+    assert res.status_code == 200
+    body = res.json()
+    assert body["unresolvedCount"] >= 1
+    assert len(body["tracks"]) == 1
+    assert body["tracks"][0]["videoId"] == "ytm_ok_1"
+    assert body["tracks"][0]["spotifyTrackId"] == "sp_1"

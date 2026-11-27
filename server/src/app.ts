@@ -194,6 +194,8 @@ app.route('/api/jiosaavn', jiosaavnRoutes);
 app.route('/api/artists', artistRoutes);
 app.route('/api/playlists', playlistRoutes);
 app.route('/api/settings', settingsRoutes);
+app.use('/api/import/*', requireAuthOrGuest);
+app.use('/api/import/*', rateLimit({ prefix: 'import', limit: 20, windowSec: 60 }));
 app.route('/api/import', importRoutes);
 app.route('/api/updates', updatesRoutes);
 

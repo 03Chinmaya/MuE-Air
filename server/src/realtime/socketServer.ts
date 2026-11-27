@@ -723,6 +723,33 @@ export function initializeRealtimeServer(httpServer: HttpServer): Server {
     socket.on('listen_together_sync', handleListenSync);
     socket.on('listen_sync', handleListenSync);
 
+    const broadcastToListenRoom = (event: string, msg: any, extra: Record<string, any> = {}) => {
+      const userId = socket.data.userId;
+      if (!userId) return;
+      const roomId = msg?.roomId || msg?.sessionId || socket.data.sessionId || socket.data.joinCode;
+      if (!roomId) return;
+      const payload = { ...(msg?.payload || msg), userId, roomId, ...extra };
+      io.to(`listen:${roomId}`).emit(event, payload);
+      if (socket.data.sessionId && socket.data.sessionId !== roomId) {
+        io.to(`listen:${socket.data.sessionId}`).emit(event, payload);
+      }
+      if (socket.data.joinCode && socket.data.joinCode !== roomId) {
+        io.to(`listen:${socket.data.joinCode}`).emit(event, payload);
+      }
+    };
+
+    socket.on('chat:message', (msg: any) => {
+      broadcastToListenRoom('chat:message', msg, { timestamp: Date.now() });
+    });
+
+    socket.on('chat:reaction', (msg: any) => {
+      broadcastToListenRoom('chat:reaction', msg);
+    });
+
+    socket.on('voice:active', (msg: any) => {
+      broadcastToListenRoom('voice:active', msg);
+    });
+
     const handleListenEnd = async (msg: any) => {
       const userId = socket.data.userId;
       if (!userId) return;
